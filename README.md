@@ -3,7 +3,7 @@
 [![sites](http://182.61.61.133/link/resources/SoC.png)](https://stop.stops.top) 
 
 #### [Vendor](https://github.com/sochub/Vendor)：[WCH](https://github.com/sochub/WCH)
-#### [Cortex](https://github.com/sochub/Cortex)：[1T E8051](https://github.com/sochub/8051)
+#### [8051](https://github.com/sochub/8051)：[1T E8051](https://github.com/sochub/8051)
 #### [Level](https://github.com/sochub/Level)：12MHz 
 
 ## [简介](https://github.com/sochub/CH559/wiki)
