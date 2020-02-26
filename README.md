@@ -1,11 +1,10 @@
 ﻿# [CH559](https://github.com/sochub/CH559) 
 
-[![sites](SoC/SoC.png)](http://www.qitas.cn) 
+[![sites](http://182.61.61.133/link/resources/SoC.png)](https://stop.stops.top) 
 
-####  qitas@qitas.cn
-
-#### 父级：[WCH-8051](https://github.com/sochub/WCH-8051) 
-#### 归属：[MCS-51](https://github.com/sochub/MCS-51) 
+#### [Vendor](https://github.com/sochub/Vendor)：[WCH](https://github.com/sochub/WCH)
+#### [Cortex](https://github.com/sochub/Cortex)：[1T E8051](https://github.com/sochub/8051)
+#### [Level](https://github.com/sochub/Level)：12MHz 
 
 ## [简介](https://github.com/sochub/CH559/wiki)
 
@@ -15,25 +14,24 @@ CH559 内嵌USB控制器和双USB收发器，支持 USB-Host 主机模式和 USB
 
 CH559提供丰富的接口资源，包括内置类485数据收发器、LED控制卡接口和快速电平捕捉功能，其他包括2组SPI、2路串口、8位并口等，UART1兼容16C550；内置4组定时器；提供1路16位PWM和2路8位PWM；支持8通道10/11位ADC。
 
-[![sites](SoC/CH559.png)](http://www.wch.cn/products/CH559.html) 
+[![sites](docs/CH559.png)](http://www.wch.cn/products/CH559.html) 
 
 ## [组成](https://github.com/sochub/CH559)
 
 - [文档](docs/)
 - [资源](src/)
-- [工程](project/)
 
-### [相似产品](https://github.com/sochub/WCH-8051)
+### [相似产品](https://github.com/sochub)
 
 - [CH558](https://github.com/sochub/CH554) 
 - [CH554](https://github.com/sochub/CH554) 
 - [CH552](https://github.com/sochub/CH552) 
-- [CH551](https://github.com/sochub/CH551) 
 
-- [CH57](https://github.com/sochub/CH57) 
-- [CH56](https://github.com/sochub/CH56) 
+### [选型建议](https://github.com/sochub)
 
-##  [SoC开发平台](http://www.qitas.cn)  
+[CH559](https://github.com/sochub/CH559)是CH55系列中的最高配置，拥有最全面的外设，可作为 [CH552](https://github.com/sochub/CH552)和[CH554](https://github.com/sochub/CH554) 向上升级的选择。
+
+###  [SoC资源平台](http://www.qitas.cn)
 
 
 
