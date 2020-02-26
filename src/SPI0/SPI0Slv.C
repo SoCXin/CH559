@@ -3,7 +3,7 @@
 * File Name          : SPI0Slv.C
 * Author             : WCH
 * Version            : V1.3
-* Date               : 2016/06/24
+* Date               : 2019/07/22
 * Description        : CH559提供SPI0从机模式操作接口函数 
 注：片选有效时，从机会自动加载SPI0_S_PRE的预置值到发送移位缓冲区，所以最好可以在片选
 有效前向SPI0_S_PRE寄存器写入预发值，或者在主机端丢弃首个接收字节，发送时注意主机会先
@@ -13,14 +13,7 @@
 *******************************************************************************/
 #include "..\DEBUG.C"                                                          //调试信息打印
 #include "..\DEBUG.H"
-
-#pragma  NOAREGS
-
-#define SPI0Interrupt   0                                                      //设定SPI0数据收发中断方式或者查询方式
-#define CH559SPI0SlvWrite(dat)  {SPI0_DATA = dat;while(S0_IF_BYTE == 0);S0_IF_BYTE = 0;}
-#define CH559SPI0SlvRead(dat)    {while(S0_IF_BYTE == 0);dat = SPI0_DATA;S0_IF_BYTE = 0;}
-UINT8 Num;
-UINT8X buf[200];
+#pragma  NOAREGS                                        
 
 /*硬件接口定义*/
 /******************************************************************************
@@ -32,6 +25,40 @@ UINT8X buf[200];
          P1.7        <==>       SCK
 *******************************************************************************/
 
+
+
+
+
+/*******************************************************************************
+* Function Name  : CH559SPI0SlvWrite(UINT8 dat)
+* Description    : CH559硬件SPI写数据，从机模式
+* Input          : UINT8 dat   数据
+* Output         : None
+* Return         : None
+*******************************************************************************/
+void CH559SPI0SlvWrite(UINT8 dat)
+{
+    SPI0_DATA = dat;
+    while(S0_FREE==0)
+    {
+        ;
+    }
+}
+/*******************************************************************************
+* Function Name  : CH559SPI0SlvRead( )
+* Description    : CH559硬件SPI0读数据，从机模式
+* Input          : None
+* Output         : None
+* Return         : UINT8 ret
+*******************************************************************************/
+UINT8 CH559SPI0SlvRead()
+{
+    while(S0_FREE == 0)
+    {
+        ;
+    }
+    return SPI0_DATA;
+}
 /*******************************************************************************
 * Function Name  : CH559SPI0InterruptInit()
 * Description    : CH559SPI0中断初始化
@@ -48,6 +75,7 @@ void CH559SPI0InterruptInit()
     SPI0_CTRL |= bS0_AUTO_IF;                                                  //自动清S0_IF_BYTE中断标志
     SPI0_STAT |= 0xff;                                                         //清空SPI0中断标志
     IE_SPI0 = 1;                                                               //使能SPI0中断
+	 EA  = 1;                                                                  //开启总中断
 }
 
 /*******************************************************************************
@@ -71,7 +99,7 @@ void CH559SPI0Init(void)
     SPI0_CTRL &= ~bS0_CLR_ALL;                                                //清空SPI0的FIFO,默认是1，必须置零才能发送数据
 }
 
-#if SPI0Interrupt
+#ifdef SPI0Interrupt
 /*******************************************************************************S
 * Function Name  : SPI0HostInterrupt(void)
 * Description    : SPI0 从机模式中断服务程序
@@ -79,56 +107,33 @@ void CH559SPI0Init(void)
 * Output         : None
 * Return         : UINT8 ret   
 *******************************************************************************/
-void	SPI0HostInterrupt( void ) interrupt INT_NO_SPI0 using 1                //* SPI0中断服务程序,使用寄存器组1
+void	SPI0HostInterrupt( void ) interrupt INT_NO_SPI0                //* SPI0中断服务程序,使用寄存器组1
 {
-	  //if(S0_IF_FIRST)                                                        //如果首字节是命令码则进行相应处理
-		//{}
-    buf[Num] = SPI0_DATA;	
-    S0_IF_BYTE = 0;                                                          // 清中断标志	
-    Num++;
-//  printf(" %02X\n",(UINT16)Num);
+	UINT8 dat;
+    dat = CH559SPI0SlvRead();
+    CH559SPI0SlvWrite(dat^0xFF);
+    printf("Read#%02x\n",(UINT16)dat);
 }
 #endif
 
 main( ) 
 {
-    UINT8 j;
-    mDelaymS(30);                                                              //上电延时,等待内部晶振稳定
+    UINT8 ret;
+    mDelaymS(10);                                                              //上电延时,等待内部晶振稳定
 //  CfgFsys( );  
-    
-    P4_DIR |= bLED2;
-    P3_DIR |= bTXD;
     mInitSTDIO( );                                                      //串口0,可以用于调试
     printf("start ...\n");  
     CH559SPI0Init();
+#ifdef SPI0Interrupt 
     CH559SPI0InterruptInit(); 
-#if SPI0Interrupt 
-    EA  = 1;                                                            //使能全局中断
-    j = 0;
-    while(1)                                                            //中断方式接收
-    {
-	      if(Num == 10)
-	      {
-		        for(j = 0;j < 10;j++)
-			      {
-		            printf("  %02X",(UINT16)buf[j]);
-			      }
-	          Num = 0;
-	      }
-    } 
 #endif 
-    j = 0;
-//     SPI0_S_PRE = 0;                                                    //从机数据发送
-//     while(1)                                                             
-//     {
-//         CH559SPI0SlvWrite(j);
-//         j++;
-//     }	
-    while(1)                                                              //从机接收数据
-    {                                                                     //因为有打印，所以注意主机时钟速率
-        CH559SPI0SlvRead(j);
-        j++;
-        printf("%02X  ",(UINT16)j);
+	
+    while(1)                                                             
+    {                                                                     
+#ifndef SPI0Interrupt
+        ret = CH559SPI0SlvRead();                                               //主机保持CS=0
+        CH559SPI0SlvWrite(ret^0xFF);                                            //SPI等待主机把数据取走,SPI 主机每次读之前先将CS=0，读完后CS=1
+        printf("Read#%02x\n",(UINT16)ret);
+#endif
     }			
-    while(1);
 }

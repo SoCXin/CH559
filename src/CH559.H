@@ -128,6 +128,14 @@ typedef const unsigned char code      *PUINT8C;
 #define STRUCT_OFFSET( s, m )       ( (UINT8)( & (((s) *)0) -> (m) ) )  /* get the offset address for a member of a structure */
 #endif
 
+#ifndef NO_XSFR_DEFINE
+#define EXTERN
+#define _AT_    _at_
+#else
+#define EXTERN  extern
+#define _AT_    ;/##/
+#endif
+
 #ifdef __cplusplus
 }
 #endif
@@ -304,6 +312,14 @@ sfr ROM_CTRL        = 0x86;         // WriteOnly: flash-ROM control
 
 /*  Port Registers  */
 sfr P0              = 0x80;         // port 0 input & output
+ sbit P0_7          = P0^7;
+ sbit P0_6          = P0^6;
+ sbit P0_5          = P0^5;
+ sbit P0_4          = P0^4;
+ sbit P0_3          = P0^3;
+ sbit P0_2          = P0^2;
+ sbit P0_1          = P0^1;
+ sbit P0_0          = P0^0;
  sbit UDCD          = P0^7;         // DCD input for UART1
  sbit URI           = P0^6;         // RI input for UART1
  sbit UDSR          = P0^5;         // DSR input for UART1
@@ -323,6 +339,14 @@ sfr P0_DIR          = 0xC4;         // port 0 direction
 #define bUDTR             0x01      // DTR output for UART1
 sfr P0_PU           = 0xC5;         // port 0 pullup enable
 sfr P1              = 0x90;         // port 1 input & output, not 5VT
+ sbit P1_7          = P1^7;
+ sbit P1_6          = P1^6;
+ sbit P1_5          = P1^5;
+ sbit P1_4          = P1^4;
+ sbit P1_3          = P1^3;
+ sbit P1_2          = P1^2;
+ sbit P1_1          = P1^1;
+ sbit P1_0          = P1^0;
  sbit AIN7          = P1^7;         // AIN7 for ADC, not 5VT
  sbit AIN6          = P1^6;         // AIN6 for ADC, not 5VT
  sbit AIN5          = P1^5;         // AIN5 for ADC, not 5VT
@@ -355,6 +379,14 @@ sfr P1_IE           = 0xB9;         // port 1 input enable
 sfr P1_DIR          = 0xBA;         // port 1 direction
 sfr P1_PU           = 0xBB;         // port 1 pullup enable
 sfr P2              = 0xA0;         // port 2 input & output
+ sbit P2_7          = P2^7;
+ sbit P2_6          = P2^6;
+ sbit P2_5          = P2^5;
+ sbit P2_4          = P2^4;
+ sbit P2_3          = P2^3;
+ sbit P2_2          = P2^2;
+ sbit P2_1          = P2^1;
+ sbit P2_0          = P2^0;
  sbit TXD1          = P2^7;         // TXD output for UART1
  sbit DA7           = P2^7;         // address 7 output for direct low address mode
  sbit RXD1          = P2^6;         // RXD input for UART1
@@ -380,6 +412,14 @@ sfr P2_DIR          = 0xBC;         // port 2 direction
 #define bMOSI1            0x02      // master serial data output for SPI1
 sfr P2_PU           = 0xBD;         // port 2 pullup enable
 sfr P3              = 0xB0;         // port 3 input & output
+ sbit P3_7          = P3^7;
+ sbit P3_6          = P3^6;
+ sbit P3_5          = P3^5;
+ sbit P3_4          = P3^4;
+ sbit P3_3          = P3^3;
+ sbit P3_2          = P3^2;
+ sbit P3_1          = P3^1;
+ sbit P3_0          = P3^0;
  sbit RD            = P3^7;         // xdata or xBUS read strobe output
  sbit WR            = P3^6;         // xdata or xBUS write strobe output
  sbit DA6           = P3^5;         // address 6 output for direct low address mode
@@ -409,6 +449,14 @@ sfr P3_DIR          = 0xBE;         // port 3 direction
 #define bRXD              0x01      // RXD input for UART0
 sfr P3_PU           = 0xBF;         // port 3 pullup enable
 sfr P4_OUT          = 0xC0;         // port 4 output
+ sbit P4_7          = P4_OUT^7;
+ sbit P4_6          = P4_OUT^6;
+ sbit P4_5          = P4_OUT^5;
+ sbit P4_4          = P4_OUT^4;
+ sbit P4_3          = P4_OUT^3;
+ sbit P4_2          = P4_OUT^2;
+ sbit P4_1          = P4_OUT^1;
+ sbit P4_0          = P4_OUT^0;
  sbit SCK_          = P4_OUT^7;     // alternate pin for SCK
  sbit SCS_          = P4_OUT^6;     // alternate pin for SCS
  sbit PWM2_         = P4_OUT^5;     // alternate pin for PWM2
@@ -1049,13 +1097,8 @@ sfr USB_DMA_AH      = 0xE7;         // ReadOnly: current DMA address high byte
 
 /*  USB auxiliary Registers on xDATA, xSFR  */
 #define REG_USB_AUX_BASE  0x2440    // USB auxiliary registers base address
-#ifndef NO_XSFR_DEFINE
-UINT8XV  UEP4_1_MOD  _at_ 0x2446;   // endpoint 4/1 mode
-UINT8PV pUEP4_1_MOD  _at_ 0x2546;
-#else
-extern UINT8XV  UEP4_1_MOD;
-extern UINT8PV pUEP4_1_MOD;
-#endif
+EXTERN  UINT8XV UEP4_1_MOD     _AT_ 0x2446;   // endpoint 4/1 mode
+#define pUEP4_1_MOD       PBYTE[0x46]
 #define bUEP1_RX_EN       0x80      // enable USB endpoint 1 receiving (OUT)
 #define bUEP1_TX_EN       0x40      // enable USB endpoint 1 transmittal (IN)
 #define bUEP1_BUF_MOD     0x10      // buffer mode of USB endpoint 1
@@ -1075,76 +1118,43 @@ extern UINT8PV pUEP4_1_MOD;
 //   0 1:  single 64 bytes buffer for endpoint 0 receiving & transmittal (OUT & IN endpoint) + 64 bytes buffer for endpoint 4 transmittal (IN endpoint), total=128bytes
 //   1 1:  single 64 bytes buffer for endpoint 0 receiving & transmittal (OUT & IN endpoint)
 //           + 64 bytes buffer for endpoint 4 receiving (OUT endpoint) + 64 bytes buffer for endpoint 4 transmittal (IN endpoint), total=192bytes
-#ifndef NO_XSFR_DEFINE
-UINT8XV  UEP2_3_MOD  _at_ 0x2447;   // endpoint 2/3 mode
-UINT8PV pUEP2_3_MOD  _at_ 0x2547;
-#else
-extern UINT8XV  UEP2_3_MOD;
-extern UINT8PV pUEP2_3_MOD;
-#endif
+EXTERN  UINT8XV UEP2_3_MOD     _AT_ 0x2447;   // endpoint 2/3 mode
+#define pUEP2_3_MOD       PBYTE[0x47]
 #define bUEP3_RX_EN       0x80      // enable USB endpoint 3 receiving (OUT)
 #define bUEP3_TX_EN       0x40      // enable USB endpoint 3 transmittal (IN)
 #define bUEP3_BUF_MOD     0x10      // buffer mode of USB endpoint 3
 #define bUEP2_RX_EN       0x08      // enable USB endpoint 2 receiving (OUT)
 #define bUEP2_TX_EN       0x04      // enable USB endpoint 2 transmittal (IN)
 #define bUEP2_BUF_MOD     0x01      // buffer mode of USB endpoint 2
-//unsigned short volatile xdata UEP0_DMA    _at_ 0x2448;   // endpoint 0&4 buffer start address, must even address, big-endian
-#ifndef NO_XSFR_DEFINE
-UINT8XV  UEP0_DMA_H  _at_ 0x2448;   // endpoint 0&4 buffer start address high byte
-UINT8XV  UEP0_DMA_L  _at_ 0x2449;   // endpoint 0&4 buffer start address low byte
-UINT8PV pUEP0_DMA_H  _at_ 0x2548;
-UINT8PV pUEP0_DMA_L  _at_ 0x2549;
-#else
-extern UINT8XV  UEP0_DMA_H;
-extern UINT8XV  UEP0_DMA_L;
-extern UINT8PV pUEP0_DMA_H;
-extern UINT8PV pUEP0_DMA_L;
-#endif
+//unsigned short volatile xdata UEP0_DMA       _AT_ 0x2448;   // endpoint 0&4 buffer start address, must even address, big-endian
+EXTERN  UINT8XV UEP0_DMA_H     _AT_ 0x2448;   // endpoint 0&4 buffer start address high byte
+EXTERN  UINT8XV UEP0_DMA_L     _AT_ 0x2449;   // endpoint 0&4 buffer start address low byte
+#define pUEP0_DMA_H       PBYTE[0x48]
+#define pUEP0_DMA_L       PBYTE[0x49]
 #define UEP0_DMA          (unsigned short volatile) UEP0_DMA_H
-#define pUEP0_DMA         (unsigned short volatile) pUEP0_DMA_H
-//unsigned short volatile xdata UEP1_DMA    _at_ 0x244A;   // endpoint 1 buffer start address, must even address, big-endian
-#ifndef NO_XSFR_DEFINE
-UINT8XV  UEP1_DMA_H  _at_ 0x244A;   // endpoint 1 buffer start address high byte
-UINT8XV  UEP1_DMA_L  _at_ 0x244B;   // endpoint 1 buffer start address low byte
-UINT8PV pUEP1_DMA_H  _at_ 0x254A;
-UINT8PV pUEP1_DMA_L  _at_ 0x254B;
-#else
-extern UINT8XV  UEP1_DMA_H;
-extern UINT8XV  UEP1_DMA_L;
-extern UINT8PV pUEP1_DMA_H;
-extern UINT8PV pUEP1_DMA_L;
-#endif
+#define pUEP0_DMA         PWORD[0x48]
+//unsigned short volatile xdata UEP1_DMA       _AT_ 0x244A;   // endpoint 1 buffer start address, must even address, big-endian
+EXTERN  UINT8XV UEP1_DMA_H     _AT_ 0x244A;   // endpoint 1 buffer start address high byte
+EXTERN  UINT8XV UEP1_DMA_L     _AT_ 0x244B;   // endpoint 1 buffer start address low byte
+#define pUEP1_DMA_H       PBYTE[0x4A]
+#define pUEP1_DMA_L       PBYTE[0x4B]
 #define UEP1_DMA          (unsigned short volatile) UEP1_DMA_H
-#define pUEP1_DMA         (unsigned short volatile) pUEP1_DMA_H
-//unsigned short volatile xdata UEP2_DMA    _at_ 0x244C;   // endpoint 2 buffer start address, must even address, big-endian
-#ifndef NO_XSFR_DEFINE
-UINT8XV  UEP2_DMA_H  _at_ 0x244C;   // endpoint 2 buffer start address high byte
-UINT8XV  UEP2_DMA_L  _at_ 0x244D;   // endpoint 2 buffer start address low byte
-UINT8PV pUEP2_DMA_H  _at_ 0x254C;
-UINT8PV pUEP2_DMA_L  _at_ 0x254D;
-#else
-extern UINT8XV  UEP2_DMA_H;
-extern UINT8XV  UEP2_DMA_L;
-extern UINT8PV pUEP2_DMA_H;
-extern UINT8PV pUEP2_DMA_L;
-#endif
+#define pUEP1_DMA         PWORD[0x4A]
+//unsigned short volatile xdata UEP2_DMA       _AT_ 0x244C;   // endpoint 2 buffer start address, must even address, big-endian
+EXTERN  UINT8XV UEP2_DMA_H     _AT_ 0x244C;   // endpoint 2 buffer start address high byte
+EXTERN  UINT8XV UEP2_DMA_L     _AT_ 0x244D;   // endpoint 2 buffer start address low byte
+#define pUEP2_DMA_H       PBYTE[0x4C]
+#define pUEP2_DMA_L       PBYTE[0x4D]
 #define UEP2_DMA          (unsigned short volatile) UEP2_DMA_H
-#define pUEP2_DMA         (unsigned short volatile) pUEP2_DMA_H
-//unsigned short volatile xdata UEP3_DMA    _at_ 0x244E;   // endpoint 3 buffer start address, must even address, big-endian
-#ifndef NO_XSFR_DEFINE
-UINT8XV  UEP3_DMA_H  _at_ 0x244E;   // endpoint 3 buffer start address high byte
-UINT8XV  UEP3_DMA_L  _at_ 0x244F;   // endpoint 3 buffer start address low byte
-UINT8PV pUEP3_DMA_H  _at_ 0x254E;
-UINT8PV pUEP3_DMA_L  _at_ 0x254F;
-#else
-extern UINT8XV  UEP3_DMA_H;
-extern UINT8XV  UEP3_DMA_L;
-extern UINT8PV pUEP3_DMA_H;
-extern UINT8PV pUEP3_DMA_L;
-#endif
+#define pUEP2_DMA         PWORD[0x4C]
+//unsigned short volatile xdata UEP3_DMA       _AT_ 0x244E;   // endpoint 3 buffer start address, must even address, big-endian
+EXTERN  UINT8XV UEP3_DMA_H     _AT_ 0x244E;   // endpoint 3 buffer start address high byte
+EXTERN  UINT8XV UEP3_DMA_L     _AT_ 0x244F;   // endpoint 3 buffer start address low byte
+#define pUEP3_DMA_H       PBYTE[0x4E]
+#define pUEP3_DMA_L       PBYTE[0x4F]
 #define UEP3_DMA          (unsigned short volatile) UEP3_DMA_H
-#define pUEP3_DMA         (unsigned short volatile) pUEP3_DMA_H
-//UINT8XV  UH_EP_MOD   _at_ 0x2447;   // host endpoint mode
+#define pUEP3_DMA         PWORD[0x4E]
+//EXTERN  UINT8XV UH_EP_MOD      _AT_ 0x2447;   // host endpoint mode
 #define UH_EP_MOD         UEP2_3_MOD
 #define pUH_EP_MOD       pUEP2_3_MOD
 #define bUH_EP_TX_EN      0x40      // enable USB host OUT endpoint transmittal
@@ -1159,46 +1169,36 @@ extern UINT8PV pUEP3_DMA_L;
 //   0 x:  disable endpoint and disable buffer
 //   1 0:  64 bytes buffer for receiving (IN endpoint)
 //   1 1:  dual 64 bytes buffer by toggle bit bUH_R_TOG selection for receiving (IN endpoint), total=128bytes
-//unsigned short volatile xdata UH_RX_DMA   _at_ 0x244C;   // host rx endpoint buffer start address, big-endian
+//unsigned short volatile xdata UH_RX_DMA      _AT_ 0x244C;   // host rx endpoint buffer start address, big-endian
 #define UH_RX_DMA         UEP2_DMA
 #define pUH_RX_DMA       pUEP2_DMA
-//UINT8XV  UH_RX_DMA_H _at_ 0x244C;   // host rx endpoint buffer start address high byte
+//EXTERN  UINT8XV UH_RX_DMA_H    _AT_ 0x244C;   // host rx endpoint buffer start address high byte
 #define UH_RX_DMA_H       UEP2_DMA_H
 #define pUH_RX_DMA_H     pUEP2_DMA_H
-//UINT8XV  UH_RX_DMA_L _at_ 0x244D;   // host rx endpoint buffer start address low byte
+//EXTERN  UINT8XV UH_RX_DMA_L    _AT_ 0x244D;   // host rx endpoint buffer start address low byte
 #define UH_RX_DMA_L       UEP2_DMA_L
 #define pUH_RX_DMA_L     pUEP2_DMA_L
-//unsigned short volatile xdata UH_TX_DMA   _at_ 0x244E;   // host tx endpoint buffer start address, big-endian
+//unsigned short volatile xdata UH_TX_DMA      _AT_ 0x244E;   // host tx endpoint buffer start address, big-endian
 #define UH_TX_DMA         UEP3_DMA
 #define pUH_TX_DMA       pUEP3_DMA
-//UINT8XV  UH_TX_DMA_H _at_ 0x244E;   // host tx endpoint buffer start address high byte
+//EXTERN  UINT8XV UH_TX_DMA_H    _AT_ 0x244E;   // host tx endpoint buffer start address high byte
 #define UH_TX_DMA_H       UEP3_DMA_H
 #define pUH_TX_DMA_H     pUEP3_DMA_H
-//UINT8XV  UH_TX_DMA_L _at_ 0x244F;   // host tx endpoint buffer start address low byte
+//EXTERN  UINT8XV UH_TX_DMA_L    _AT_ 0x244F;   // host tx endpoint buffer start address low byte
 #define UH_TX_DMA_L       UEP3_DMA_L
 #define pUH_TX_DMA_L     pUEP3_DMA_L
 
 /*  LED Registers on xDATA, xSFR  */
 #define REG_LED_BASE      0x2880    // LED registers base address
-#ifndef NO_XSFR_DEFINE
-UINT8XV  LED_STAT    _at_ 0x2880;   // LED status
-UINT8PV pLED_STAT    _at_ 0x2980;
-#else
-extern UINT8XV  LED_STAT;
-extern UINT8PV pLED_STAT;
-#endif
+EXTERN  UINT8XV LED_STAT       _AT_ 0x2880;   // LED status
+#define pLED_STAT         PBYTE[0x80]
 #define bLED_IF_DMA_END   0x80      // interrupt flag for DMA completion, write 1 to clear or write LED_DMA_CN to clear
 #define bLED_FIFO_EMPTY   0x40      // ReadOnly: indicate FIFO empty status
 #define bLED_IF_FIFO_REQ  0x20      // interrupt flag for request FIFO data ( FIFO <=2), write 1 to clear
 #define bLED_CLOCK        0x10      // ReadOnly: current LED clock level
 #define MASK_LED_FIFO_CNT 0x07      // ReadOnly: bit mask of LED FIFO count
-#ifndef NO_XSFR_DEFINE
-UINT8XV  LED_CTRL    _at_ 0x2881;   // LED control
-UINT8PV pLED_CTRL    _at_ 0x2981;
-#else
-extern UINT8XV  LED_CTRL;
-extern UINT8PV pLED_CTRL;
-#endif
+EXTERN  UINT8XV LED_CTRL       _AT_ 0x2881;   // LED control
+#define pLED_CTRL         PBYTE[0x81]
 #define bLED_CHAN_MOD1    0x80      // LED channel mode high bit
 #define bLED_CHAN_MOD0    0x40      // LED channel mode low bit
 #define MASK_LED_CHAN_MOD 0xC0      // bit mask of LED channel mode
@@ -1213,57 +1213,28 @@ extern UINT8PV pLED_CTRL;
 #define bLED_OUT_POLAR    0x04      // LED output polarity: 0=pass, 1=invert
 #define bLED_CLR_ALL      0x02      // force clear FIFO and count of LED
 #define bLED_BIT_ORDER    0x01      // LED bit data order: 0=LSB first, 1=MSB first
-#ifndef NO_XSFR_DEFINE
-UINT8XV  LED_DATA    _at_ 0x2882;   // WriteOnly: data port
-UINT8PV pLED_DATA    _at_ 0x2982;
-#else
-extern UINT8XV  LED_DATA;
-extern UINT8PV pLED_DATA;
-#endif
-//UINT8XV  LED_FIFO_CN _at_ 0x2882;   // ReadOnly: FIFO count status
+EXTERN  UINT8XV LED_DATA       _AT_ 0x2882;   // WriteOnly: data port
+#define pLED_DATA         PBYTE[0x82]
+//EXTERN  UINT8XV LED_FIFO_CN    _AT_ 0x2882;   // ReadOnly: FIFO count status
 #define LED_FIFO_CN       LED_DATA
-#ifndef NO_XSFR_DEFINE
-UINT8XV  LED_CK_SE   _at_ 0x2883;   // clock divisor setting
-UINT8PV pLED_CK_SE   _at_ 0x2983;
-#else
-extern UINT8XV  LED_CK_SE;
-extern UINT8PV pLED_CK_SE;
-#endif
-//unsigned short volatile xdata LED_DMA     _at_ 0x2884;   // DMA address, must even address, big-endian, automatic increasing after DMA
-#ifndef NO_XSFR_DEFINE
-UINT8XV  LED_DMA_AH  _at_ 0x2884;   // DMA address high byte, automatic increasing after DMA
-UINT8XV  LED_DMA_AL  _at_ 0x2885;   // DMA address low byte, automatic increasing after DMA
-UINT8PV pLED_DMA_AH  _at_ 0x2984;
-UINT8PV pLED_DMA_AL  _at_ 0x2985;
-#else
-extern UINT8XV  LED_DMA_AH;
-extern UINT8XV  LED_DMA_AL;
-extern UINT8PV pLED_DMA_AH;
-extern UINT8PV pLED_DMA_AL;
-#endif
+EXTERN  UINT8XV LED_CK_SE      _AT_ 0x2883;   // clock divisor setting
+#define pLED_CK_SE        PBYTE[0x83]
+//unsigned short volatile xdata LED_DMA        _AT_ 0x2884;   // DMA address, must even address, big-endian, automatic increasing after DMA
+EXTERN  UINT8XV LED_DMA_AH     _AT_ 0x2884;   // DMA address high byte, automatic increasing after DMA
+EXTERN  UINT8XV LED_DMA_AL     _AT_ 0x2885;   // DMA address low byte, automatic increasing after DMA
+#define pLED_DMA_AH       PBYTE[0x84]
+#define pLED_DMA_AL       PBYTE[0x85]
 #define LED_DMA           (unsigned short volatile) LED_DMA_AH
-#define pLED_DMA          (unsigned short volatile) pLED_DMA_AH
-#ifndef NO_XSFR_DEFINE
-UINT8XV  LED_DMA_CN  _at_ 0x2886;   // DMA remainder word count, just main buffer and exclude aux buffer, automatic decreasing after DMA
-UINT8PV pLED_DMA_CN  _at_ 0x2986;
-#else
-extern UINT8XV  LED_DMA_CN;
-extern UINT8PV pLED_DMA_CN;
-#endif
-//unsigned short volatile xdata LED_DMA_X   _at_ 0x2888;   // aux buffer DMA address, must even address, big-endian, automatic increasing after DMA
-#ifndef NO_XSFR_DEFINE
-UINT8XV  LED_DMA_XH  _at_ 0x2888;   // aux buffer DMA address high byte, automatic increasing after DMA
-UINT8XV  LED_DMA_XL  _at_ 0x2889;   // aux buffer DMA address low byte, automatic increasing after DMA
-UINT8PV pLED_DMA_XH  _at_ 0x2988;
-UINT8PV pLED_DMA_XL  _at_ 0x2989;
-#else
-extern UINT8XV  LED_DMA_XH;
-extern UINT8XV  LED_DMA_XL;
-extern UINT8PV pLED_DMA_XH;
-extern UINT8PV pLED_DMA_XL;
-#endif
+#define pLED_DMA          PWORD[0x84]
+EXTERN  UINT8XV LED_DMA_CN     _AT_ 0x2886;   // DMA remainder word count, just main buffer and exclude aux buffer, automatic decreasing after DMA
+#define pLED_DMA_CN       PBYTE[0x86]
+//unsigned short volatile xdata LED_DMA_X      _AT_ 0x2888;   // aux buffer DMA address, must even address, big-endian, automatic increasing after DMA
+EXTERN  UINT8XV LED_DMA_XH     _AT_ 0x2888;   // aux buffer DMA address high byte, automatic increasing after DMA
+EXTERN  UINT8XV LED_DMA_XL     _AT_ 0x2889;   // aux buffer DMA address low byte, automatic increasing after DMA
+#define pLED_DMA_XH       PBYTE[0x88]
+#define pLED_DMA_XL       PBYTE[0x89]
 #define LED_DMA_X         (unsigned short volatile) LED_DMA_XH
-#define pLED_DMA_X        (unsigned short volatile) pLED_DMA_XH
+#define pLED_DMA_X        PWORD[0x88]
 
 /*----- Reference Information --------------------------------------------*/
 #define ID_CH559          0x59      // chip ID

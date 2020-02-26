@@ -2,8 +2,8 @@
 * File Name          : SPI1Master.C
 * Author             : WCH
 * Version            : V1.3
-* Date               : 2016/06/24
-* Description        : CH559 SPI1主机接口操作CH376
+* Date               : 2019/07/22
+* Description        : CH559 SPI1主机接口操作SPI从机
 *******************************************************************************/
 
 /*硬件接口定义*/
@@ -67,10 +67,8 @@ void CH559SPI1Write(UINT8 dat)
 *******************************************************************************/
 UINT8 CH559SPI1Read( )
 {
-//  SCS = 0;
     SPI1_DATA = 0xff;                                                          //启动时钟                                               
-    while((SPI1_STAT & 0x08) == 0);                                            //等待传输完成
-//  SCS = 1;	
+    while((SPI1_STAT & 0x08) == 0);                                            //等待传输完成	
     return SPI1_DATA;
 }
 
@@ -83,24 +81,26 @@ main( )
     P4_DIR |= bLED2;
     P3_DIR |= bTXD;
     mInitSTDIO( );                                                            //串口0,可以用于调试
-    printf("start ...\n");  
+    printf("master_SPI1_start ...\n");  
 	
-    CH559SPI1Init();                                                          //SPI1的初始化 
+    CH559SPI1Init();   
+    mDelaymS(100);	//SPI1的初始化 
     while(1)
     { 
 	     SCS = 0;
-	     CH559SPI1Write(0x06);
-	     mDelayuS(2);
 	     CH559SPI1Write(i);
 	     mDelayuS(2);
 	     ret = CH559SPI1Read();
-	     if(ret != (i^0xff))
-	     {
-	         SCK = ~SCK;
-	         printf("%02X  %02X",(UINT16)i,(UINT16)ret);				
-	     }
-	     SCS = 1;
-			 i++;
-		   mDelaymS(20);   		
+		 SCS = 1;
+	      if(ret != (i^0xff))
+        {
+            printf("Err: %02X  %02X  \n",(UINT16)i,(UINT16)ret);               //如果不等于发送数据的取反，打印错误信息
+        }
+        else
+        {
+            printf("success %02x\n",(UINT16)i);                               
+        }
+		 i++;
+		 mDelaymS(20);   		
     }
 }

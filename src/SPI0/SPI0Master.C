@@ -3,7 +3,7 @@
 * File Name          : SPI0Mater.C
 * Author             : WCH
 * Version            : V1.3
-* Date               : 2016/06/24
+* Date               : 2019/07/22
 * Description        : CH559提供SPI0主机模式操作接口函数             				   
 *******************************************************************************/
 #include "..\DEBUG.C"                                                          //调试信息打印
@@ -26,24 +26,6 @@ UINT8 TmpBuf;
          P1.7        <==>       SCK
 *******************************************************************************/
 
-/*******************************************************************************
-* Function Name  : CH559SPI0InterruptInit()
-* Description    : CH559SPI0中断初始化
-* Input          : None
-* Output         : None
-* Return         : None
-*******************************************************************************/
-void CH559SPI0InterruptInit()
-{
-    //IP_EX |= bIP_SPI0;                                                       //SPI0中断优先级设置
-    SPI0_SETUP |= bS0_IE_FIFO_OV | bS0_IE_BYTE;                                //使能接收1字节中断，使能FIFO溢出中断
-    SPI0_CTRL |= bS0_AUTO_IF;                                                  //自动清S0_IF_BYTE中断标志
-    SPI0_STAT |= 0xff;                                                         //清空SPI0中断标志
-#if SPI0Interrupt
-    IE_SPI0 = 1;                                                               //使能SPI0中断
-#endif
-}
-
 
 /*******************************************************************************
 * Function Name  : CH559SPI0HostInit()
@@ -63,7 +45,7 @@ void CH559SPI0HostInit(void)
     SPI0_CTRL &= ~(bS0_MST_CLK | bS0_2_WIRE);
     SPI0_CTRL &=  ~(bS0_DATA_DIR);                                             //主机写，默认不启动写传输，如果使能bS0_DATA_DIR，
 	                                                                             //那么发送数据后自动产生一个字节的时钟，用于快速数据收发	
-    SPI0_CK_SE = 0x40;
+    SET_SPI0_CK(6);                                                              //6分频
     SPI0_CTRL &= ~bS0_CLR_ALL;                                                 //清空SPI0的FIFO,默认是1，必须置零才能发送数据
 }
 
@@ -95,64 +77,33 @@ UINT8 CH559SPI0Read()
     return SPI0_DATA;
 }
 
-#if SPI0Interrupt
-/*******************************************************************************
-* Function Name  : SPI0HostInterrupt(void)
-* Description    : SPI0 主机模式中断服务程序
-* Input          : None
-* Output         : None
-* Return         : UINT8 ret   
-*******************************************************************************/
-void	SPI0HostInterrupt( void ) interrupt INT_NO_SPI0 using 1                //SPI0中断服务程序,使用寄存器组1
-{ 
-    if(flag == 0)
-    {
-        while(S0_FREE == 0);
-    }
-    if(flag == 1)
-    {
-        while(S0_FREE == 0);
-        TmpBuf = SPI0_DATA;
-    }
-    //printf("sta %02X",(UINT16)SPI0_STAT);
-    //printf("fl %02X",(UINT16)flag);
-    SPI0_STAT = 0xff; 
-}
-#endif
+
 
 void main()
 {
     UINT8 ret,i=0;
     mDelaymS(30);                                                              //上电延时,等待内部晶振稳定,必加 
 //  CfgFsys( );     
-    
-    P4_DIR |= bLED2;
-    P3_DIR |= bTXD;
     mInitSTDIO( );                                                             //串口0,可以用于调试
     printf("start ...\n");  
-	
     CH559SPI0HostInit();                                                       //SPI0主机模式初始化
-#if SPI0Interrupt
-    CH559SPI0InterruptInit();                                                  //SPI0中断初始化
-    EA  = 1;                                                                   //使能全局中断
-#endif
+	mDelaymS(100);
     while(1)
     {   
-	      SCS = 0; 
-        CH559SPI0Write(0x06);                                                  //CH559和CH376通讯
-//		  flag = 0;
-        mDelayuS(2);
+	     SCS = 0;                                                               //SPI主机发送数据
         CH559SPI0Write(i);
-        mDelayuS(2);
-//		  flag = 1;
-        TmpBuf = CH559SPI0Read();
+        mDelaymS(5);
+        ret = CH559SPI0Read();                                            //接收SPI从机返回的数据，取反返回
         SCS = 1;
-        if(TmpBuf != (i^0xff))
+        if(ret != (i^0xff))
         {
-            LED2 = !LED2;
-		        printf("%02X  %02X  \n",(UINT16)i,(UINT16)TmpBuf);					
+            printf("Err: %02X  %02X  \n",(UINT16)i,(UINT16)ret);               //如果不等于发送数据的取反，打印错误信息
         }
-		    mDelaymS(10);
-				i = i+2;
+        else
+        {
+            printf("success %02x\n",(UINT16)i);                               
+        }
+        i = i+1;
+        mDelaymS(50);
     }
 }
