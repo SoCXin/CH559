@@ -14,6 +14,7 @@ CH559 内嵌USB控制器和双USB收发器，支持 USB-Host 主机模式和 USB
 
 CH559提供丰富的接口资源，包括内置类485数据收发器、LED控制卡接口和快速电平捕捉功能，其他包括2组SPI、2路串口、8位并口等，UART1兼容16C550；内置4组定时器；提供1路16位PWM和2路8位PWM；支持8通道10/11位ADC。
 
+[![sites](docs/CH55.png)](http://www.wch.cn/products/category/5.html) 
 [![sites](docs/CH559.png)](http://www.wch.cn/products/CH559.html) 
 
 ## [组成](https://github.com/sochub/CH559)
