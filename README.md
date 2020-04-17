@@ -3,8 +3,8 @@
 [![sites](http://182.61.61.133/link/resources/SoC.png)](https://stop.stops.top) 
 
 #### [Vendor](https://github.com/sochub/Vendor)：[WCH](https://github.com/sochub/WCH)
-#### [8051](https://github.com/sochub/8051)：[1T E8051](https://github.com/sochub/8051)
-#### [Level](https://github.com/sochub/Level)：12MHz 
+#### [Core](https://github.com/sochub/8051)：[E8051](https://github.com/sochub/8051)
+#### [Level](https://github.com/sochub/Level)：12/56MHz
 
 ## [简介](https://github.com/sochub/CH559/wiki)
 
@@ -17,20 +17,23 @@ CH559提供丰富的接口资源，包括内置类485数据收发器、LED控制
 [![sites](docs/CH55.png)](http://www.wch.cn/products/category/5.html) 
 [![sites](docs/CH559.png)](http://www.wch.cn/products/CH559.html) 
 
-## [组成](https://github.com/sochub/CH559)
+* 芯片封装：LQFP48、SSOP20
 
-- [文档](docs/)
-- [资源](src/)
+[![sites](docs/package.png)](http://www.wch.cn/products/CH559.html) 
 
-### [相似产品](https://github.com/sochub)
+### [资源收录](https://github.com/sochub)
 
-- [CH558](https://github.com/sochub/CH554) 
-- [CH554](https://github.com/sochub/CH554) 
-- [CH552](https://github.com/sochub/CH552) 
+* [参考文档](docs/)
+* [参考资源](src/)
+
+#### [外部资源](https://github.com/sochub)
+
+* [OS-Q H05](https://github.com/OS-Q/H05)
+* [编译器SDCC](https://github.com/sochub/sdcc)
 
 ### [选型建议](https://github.com/sochub)
 
-[CH559](https://github.com/sochub/CH559)是CH55系列中的最高配置，拥有最全面的外设，可作为 [CH552](https://github.com/sochub/CH552)和[CH554](https://github.com/sochub/CH554) 向上升级的选择。
+[CH559](https://github.com/sochub/CH559)是CH55系列中的最高配置，拥有最全面的外设，其量产降配可选[CH558](https://github.com/sochub/CH558) ，之下还有[CH549](https://github.com/sochub/CH549)、[CH547](https://github.com/sochub/CH547)，[CH554](https://github.com/sochub/CH554)等产品。
 
 ###  [SoC资源平台](http://www.qitas.cn)
 
