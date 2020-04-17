@@ -1,0 +1,3 @@
+[submodule "src/project/SDCC"]
+	path = src/project/SDCC
+	url = https://github.com/sochub/SDCC.git
