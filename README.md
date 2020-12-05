@@ -1,42 +1,43 @@
-﻿# [CH559](https://github.com/sochub/CH559) 
+﻿# [CH559](https://github.com/SoCXin/CH559)
 
-[![sites](http://182.61.61.133/link/resources/SoC.png)](https://stop.stops.top) 
+[![sites](http://182.61.61.133/link/resources/SoC.png)](http://www.SoC.Xin)
 
-#### [Vendor](https://github.com/sochub/Vendor)：[WCH](https://github.com/sochub/WCH)
-#### [Core](https://github.com/sochub/8051)：[E8051](https://github.com/sochub/8051)
-#### [Level](https://github.com/sochub/Level)：12/56MHz
+#### [Vendor](https://github.com/SoCXin/Vendor)：[WCH](http://www.wch.cn/)
+#### [Core](https://github.com/SoCXin/8051)：[E8051](https://github.com/SoCXin/8051)
+#### [Level](https://github.com/SoCXin/Level)：56MHz
+## [CH559简介](https://github.com/SoCXin/CH559/wiki)
 
-## [简介](https://github.com/sochub/CH559/wiki)
 
-CH559是一款兼容MCS51的增强型E8051内核单片机，79%的指令是单字节单周期指令，内置60K Code Flash，6K+256B Ram。于2015年初推出，具有很高的性价比。
+[CH559](https://github.com/SoCXin/CH559)兼容MCS51的增强型E8051内核，79%指令是单字节单周期指令，3K BootLoader + 60K CodeFlash，6K xRAM + 256B iRAM，1K DataFlash。
 
-CH559 内嵌USB控制器和双USB收发器，支持 USB-Host 主机模式和 USB-Device 设备模式，支持 USB 2.0 全速 12Mbps 或者低速 1.5Mbps，USB 主机模式下可以通过双端口 Root-HUB 同时管理两个 USB 设备。支持最大 64 字节数据包，内置 FIFO，支持 DMA。
+内嵌USB控制器和双USB收发器，支持 USB-Host 主机模式和 USB-Device 设备模式，支持 USB 2.0 全速 12Mbps，USB 主机模式下可以通过双端口Root-HUB 同时管理两个USB设备。内置FIFO支持最大64字节数据包,支持 DMA。
 
-CH559提供丰富的接口资源，包括内置类485数据收发器、LED控制卡接口和快速电平捕捉功能，其他包括2组SPI、2路串口、8位并口等，UART1兼容16C550；内置4组定时器；提供1路16位PWM和2路8位PWM；支持8通道10/11位ADC。
+接口包括内置类485数据收发器、LED控制卡接口和快速电平捕捉功能，其他包括2组SPI、2路串口、8位并口等，UART1兼容16C550；内置4组定时器；提供1路16位PWM和2路8位PWM；支持8通道10/11位ADC。
 
-[![sites](docs/CH55.png)](http://www.wch.cn/products/category/5.html) 
-[![sites](docs/CH559.png)](http://www.wch.cn/products/CH559.html) 
+内置时钟和PLL，支持外部晶振。
 
-* 芯片封装：LQFP48、SSOP20
 
-[![sites](docs/package.png)](http://www.wch.cn/products/CH559.html) 
+[![sites](docs/CH559.png)](http://www.wch.cn/products/CH559.html)
 
-### [资源收录](https://github.com/sochub)
+#### 关键特性
+
+* 5V->3.3V LDO
+* 双USB收发器，USB主机模式下可以通过内嵌的双端口Root-HUB同时管理两个USB设备
+* SPI x 2 + UART x 2 (FIFO/modem/16C550/iRS485)
+* 8通道 1MSPS 10/11bit ADC
+* 封装(LQFP48/SSOP20)
+
+### [资源收录](https://github.com/SoCXin)
 
 * [参考文档](docs/)
 * [参考资源](src/)
-* [开发工具](tools/)
+* [参考工程](project/)
 
-#### [外部资源](https://github.com/sochub)
+### [选型建议](https://github.com/SoCXin)
 
-* [OS-Q H05](https://github.com/OS-Q/H05)
-* [编译器SDCC](https://github.com/sochub/sdcc)
+[CH559](https://github.com/SoCXin/CH559)
 
-### [选型建议](https://github.com/sochub)
-
-[CH559](https://github.com/sochub/CH559)是CH55系列中的最高配置，拥有最全面的外设，其量产降配可选[CH558](https://github.com/sochub/CH558) ，之下还有[CH549](https://github.com/sochub/CH549)、[CH547](https://github.com/sochub/CH547)，[CH554](https://github.com/sochub/CH554)等产品。
-
-###  [SoC资源平台](http://www.qitas.cn)
+###  [SoC芯平台](http://www.SoC.Xin)
 
 
 
