@@ -1,8 +1,0 @@
-{
-    "name":"CH558",
-    "Core":"8051",
-    "Vendor":"wch",
-    "description":"1T 8051 CH558 MCU",
-    "url":"https://github.com/SoCXin/CH558",
-    "version":"1.0.0"
-}
