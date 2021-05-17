@@ -48,9 +48,8 @@ jobs:
       fail-fast: false
       matrix:
         items:
-          - "JTAG"
-          - "jump_to_bl"
-          - "si5351"
+          - "CH559Blink"
+          - "CH559UART0"
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:

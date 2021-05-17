@@ -2,11 +2,13 @@
 
 [![sites](http://182.61.61.133/link/resources/SoC.png)](http://www.SoC.Xin)
 
-#### [Vendor](https://github.com/SoCXin/Vendor)：[WCH](http://www.wch.cn/)
-#### [Core](https://github.com/SoCXin/8051)：[E8051](https://github.com/SoCXin/8051)
-#### [Level](https://github.com/SoCXin/Level)：56MHz
-## [CH559简介](https://github.com/SoCXin/CH559/wiki)
+[![Build Status](https://github.com/SoCXin/CH552/workflows/project/badge.svg)](https://github.com/SoCXin/CH552/actions/workflows/project.yml)
+[![Build Status](https://github.com/SoCXin/CH552/workflows/src/badge.svg)](https://github.com/SoCXin/CH552/actions/workflows/src.yml)
 
+#### [Vendor](https://github.com/SoCXin/Vendor)：[WCH](http://www.wch.cn/)
+#### [Core](https://github.com/SoCXin/8051)：[8051](https://github.com/SoCXin/8051)
+#### [Level](https://github.com/SoCXin/Level)：56MHz
+## [简介](https://github.com/SoCXin/CH559/wiki)
 
 [CH559](https://github.com/SoCXin/CH559)兼容MCS51的增强型E8051内核，79%指令是单字节单周期指令，3K BootLoader + 60K CodeFlash，6K xRAM + 256B iRAM，1K DataFlash。
 
@@ -37,7 +39,4 @@
 
 [CH559](https://github.com/SoCXin/CH559)
 
-###  [SoC芯平台](http://www.SoC.Xin)
-
-
-
+###  [探索芯世界 www.SoC.xin](http://www.SoC.Xin)
