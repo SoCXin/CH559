@@ -2,7 +2,6 @@
 
 [![sites](http://182.61.61.133/link/resources/SoC.png)](http://www.SoC.Xin)
 
-[![Build Status](https://github.com/SoCXin/CH559/workflows/project/badge.svg)](https://github.com/SoCXin/CH559/actions/workflows/project.yml)
 [![Build Status](https://github.com/SoCXin/CH559/workflows/src/badge.svg)](https://github.com/SoCXin/CH559/actions/workflows/src.yml)
 
 * [WCH](http://www.wch.cn/)：[8051](https://github.com/SoCXin/8051)
