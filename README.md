@@ -36,7 +36,11 @@
 
 [CH559](https://github.com/SoCXin/CH559)
 
-* LQFP48 (7*7mm)
-* SSOP20
+* CH559L:LQFP48 (7*7mm)
+* CH559T:SSOP20 (5.3mm)
+
+#### 相关开发板
+
+[![sites](docs/B.jpg)](https://item.taobao.com/item.htm?spm=a230r.1.14.21.2a2f27eex4iIfZ&id=578043172571&ns=1&abbucket=18#detail)
 
 ### [探索芯世界 www.SoC.xin](http://www.SoC.Xin)

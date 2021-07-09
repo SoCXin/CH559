@@ -43,36 +43,69 @@ jobs:
         name: code_check_report
         path: codecheck.txt
 
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        items:
-          - "CH559Blink"
-          - "CH559UART0"
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out
-        uses: actions/checkout@v2
-        with:
-          submodules: "recursive"
-          fetch-depth: 1
+  # ubuntu:
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       items:
+  #         - "CH559Blink"
+  #         - "CH559UART0"
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Check out
+  #       uses: actions/checkout@v2
+  #       with:
+  #         submodules: "recursive"
+  #         fetch-depth: 1
 
-      - name: Install sdcc
-        run: |
-          wget https://sourceforge.net/projects/sdcc/files/sdcc-linux-amd64/4.0.0/sdcc-4.0.0-amd64-unknown-linux2.5.tar.bz2
-          tar -xf sdcc-4.0.0-amd64-unknown-linux2.5.tar.bz2
-          echo `pwd`/sdcc-4.0.0/bin >> $GITHUB_PATH
+  #     - name: Install sdcc
+  #       run: |
+  #         wget https://sourceforge.net/projects/sdcc/files/sdcc-linux-amd64/4.0.0/sdcc-4.0.0-amd64-unknown-linux2.5.tar.bz2
+  #         tar -xf sdcc-4.0.0-amd64-unknown-linux2.5.tar.bz2
+  #         echo `pwd`/sdcc-4.0.0/bin >> $GITHUB_PATH
 
-      - name: Build template
-        if: success()
-        working-directory: src/template
-        run: |
-          make -C ${{ matrix.items }}
+  #     - name: Build test
+  #       if: success()
+  #       working-directory: src/test
+  #       run: |
+  #         make -C ${{ matrix.items }}
 
-      - uses: actions/upload-artifact@v2
-        if: success()
-        with:
-          name: upload_template
-          path: src/template/${{ matrix.items }}
+  #     - uses: actions/upload-artifact@v2
+  #       if: success()
+  #       with:
+  #         name: upload_test
+  #         path: src/test/${{ matrix.items }}
+
+  # window:
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       items:
+  #         - "CH559Blink"
+  #         - "CH559UART0"
+  #   runs-on: window-latest
+  #   steps:
+  #     - name: Check out
+  #       uses: actions/checkout@v2
+  #       with:
+  #         submodules: "recursive"
+  #         fetch-depth: 1
+
+  #     - name: Install sdcc
+  #       run: |
+  #         wget https://sourceforge.net/projects/sdcc/files/sdcc-win64/4.1.0/sdcc-4.1.0-x64-setup.exe
+  #         tar -xf sdcc-4.0.0-amd64-unknown-linux2.5.tar.bz2
+  #         echo `pwd`/sdcc-4.0.0/bin >> $GITHUB_PATH
+
+  #     - name: Build test
+  #       if: success()
+  #       working-directory: src/test
+  #       run: |
+  #         make -C ${{ matrix.items }}
+
+  #     - uses: actions/upload-artifact@v2
+  #       if: success()
+  #       with:
+  #         name: upload_test
+  #         path: src/test/${{ matrix.items }}
 
