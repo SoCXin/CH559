@@ -3,7 +3,9 @@
 Please install Python 3.x and PyUSB first.
 
 ```
-pip install pyusb
+sudo apt install libusb*
+sudo pip install pyusb
+sudo python dump.py
 ```
 
 Then, plug your device and make sure it in **download mode**.
