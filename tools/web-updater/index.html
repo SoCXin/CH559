@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:creator" content="@_gonnoc" />
+    <meta name="twitter:title" content="CH559 Web Updater" />
+    <meta
+      name="twitter:description"
+      content="ブラウザからKeyboard Quantizerのホスト用IC(CH559)にファームウェアを書き込めます"
+    />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CH559 Web Updater</title>
+  </head>
+  <body>
+    <main>
+      <h1>CH559 Web Updater</h1>
+      <label
+        >Version:
+        <select id="version">
+          <option value="0_3_3" selected>0.3.3</option>
+          <option value="0_3_2">0.3.2</option>
+        </select>
+      </label>
+      <input type="button" id="verify" value="verify" />
+      <input type="button" id="flash" value="flash" />
+      <div>
+        <textarea readonly cols="100" rows="15" id="progress"></textarea>
+      </div>
+      <ol>
+        <li>Click flash button</li>
+        <li>Plug Keyboard Quantizer with bootloader firmware</li>
+        <li>Select serial port appeared</li>
+        <li>Wait flashing complete</li>
+      </ol>
+      <script src="./src/index.js"></script>
+    </main>
+  </body>
+</html>

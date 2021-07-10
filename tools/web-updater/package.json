@@ -1,0 +1,28 @@
+{
+  "name": "ch559-web-updater",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "sekigon-gonnoc <43873124+sekigon-gonnoc@users.noreply.github.com>",
+  "license": "MIT",
+  "browserslist": [
+    "since 2017-06"
+  ],
+  "scripts": {
+    "build": "export REVISION=$(git rev-parse --short HEAD);parcel build index.html --public-url .",
+    "start": "export REVISION=$(git rev-parse --short HEAD);parcel start index.html --https",
+    "fmt": "prettier --write package.json src/*.js src/*.ts *.html"
+  },
+  "devDependencies": {
+    "eslint": "^7.20.0",
+    "eslint-config-prettier": "^8.0.0",
+    "eslint-plugin-prettier": "^3.3.1",
+    "parcel": "^1.12.4",
+    "parcel-plugin-static-files-copy": "^2.5.1",
+    "prettier": "^2.2.1",
+    "typescript": "^4.1.5"
+  },
+  "staticFiles": {
+    "staticPath": "static",
+    "watcherGlob": "**"
+  }
+}
