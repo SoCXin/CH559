@@ -9,9 +9,12 @@
 #include "..\..\DEBUG.H"
 #include <string.h>
 #define THIS_ENDP0_SIZE         DEFAULT_ENDP0_SIZE
-UINT8X  Ep0Buffer[64<(THIS_ENDP0_SIZE+2)?64:(THIS_ENDP0_SIZE+2)] _at_ 0x0000;  //端点0 OUT&IN缓冲区，必须是偶地址
-UINT8X  Ep1Buffer[64<(MAX_PACKET_SIZE+2)?64:(MAX_PACKET_SIZE+2)] _at_ 0x000A;  //端点1 IN缓冲区,必须是偶地址
-UINT8X  Ep2Buffer[64<(MAX_PACKET_SIZE+2)?64:(MAX_PACKET_SIZE+2)] _at_ 0x0050;  //端点2 IN缓冲区,必须是偶地址
+#define ENDP1_IN_SIZE           8
+#define ENDP2_IN_SIZE           4
+
+UINT8X  Ep0Buffer[MIN(64,THIS_ENDP0_SIZE+2)] _at_ 0x0000;  //端点0 OUT&IN缓冲区，必须是偶地址
+UINT8X  Ep1Buffer[MIN(64,ENDP1_IN_SIZE+2)] _at_ MIN(64,THIS_ENDP0_SIZE+2);  //端点1 IN缓冲区,必须是偶地址
+UINT8X  Ep2Buffer[MIN(64,ENDP2_IN_SIZE+2)] _at_ (MIN(64,THIS_ENDP0_SIZE+2)+MIN(64,ENDP1_IN_SIZE+2));  //端点2 IN缓冲区,必须是偶地址
 UINT8   SetupReq,SetupLen,Ready,Count,FLAG,UsbConfig;
 PUINT8  pDescr;                                                                //USB配置标志
 USB_SETUP_REQ   SetupReqBuf;                                                   //暂存Setup包
@@ -30,10 +33,10 @@ UINT8C CfgDesc[59] =
     0x09,0x02,0x3b,0x00,0x02,0x01,0x00,0xA0,0x32,             //配置描述符
     0x09,0x04,0x00,0x00,0x01,0x03,0x01,0x01,0x00,             //接口描述符,键盘
     0x09,0x21,0x11,0x01,0x00,0x01,0x22,0x3e,0x00,             //HID类描述符
-    0x07,0x05,0x81,0x03,0x08,0x00,0x0a,                       //端点描述符
+    0x07,0x05,0x81,0x03,ENDP1_IN_SIZE,0x00,0x0a,                       //端点描述符
     0x09,0x04,0x01,0x00,0x01,0x03,0x01,0x02,0x00,             //接口描述符,鼠标
     0x09,0x21,0x10,0x01,0x00,0x01,0x22,0x34,0x00,             //HID类描述符
-    0x07,0x05,0x82,0x03,0x04,0x00,0x0a                        //端点描述符
+    0x07,0x05,0x82,0x03,ENDP2_IN_SIZE,0x00,0x0a                        //端点描述符
 };
 /*字符串描述符*/
 /*HID类报表描述符*/
@@ -111,15 +114,12 @@ void USBDeviceEndPointCfg()
     UEP4_1_MOD |= bUEP1_TX_EN;                                                 //端点1发送使能
     UEP4_1_MOD &= ~bUEP1_RX_EN;                                                //端点1接收禁止
     UEP4_1_MOD &= ~bUEP1_BUF_MOD;                                              //端点1单64字节发送缓冲区
-    UEP1_CTRL = bUEP_AUTO_TOG | UEP_T_RES_NAK;                                 //端点1自动翻转同步标志位，IN事务返回NAK
     UEP2_DMA = Ep2Buffer;                                                      //端点2数据传输地址
     UEP2_3_MOD |= bUEP2_TX_EN;                                                 //端点2发送使能
     UEP2_3_MOD &= ~bUEP2_RX_EN;                                                //端点2接收禁止
     UEP2_3_MOD &= ~bUEP2_BUF_MOD;                                              //端点2单64字节发送缓冲区
-    UEP2_CTRL = bUEP_AUTO_TOG | UEP_T_RES_NAK;                                 //端点2自动翻转同步标志位，IN事务返回NAK
     UEP0_DMA = Ep0Buffer;                                                      //端点0数据传输地址
     UEP4_1_MOD &= ~(bUEP4_RX_EN | bUEP4_TX_EN);                                //端点0单64字节收发缓冲区
-    UEP0_CTRL = UEP_R_RES_ACK | UEP_T_RES_NAK;                                 //OUT事务返回ACK，IN事务返回NAK
 }
 /*******************************************************************************
 * Function Name  : enp1IntIn()
@@ -166,17 +166,18 @@ void    DeviceInterrupt( void ) interrupt INT_NO_USB using 1                    
         {
         case UIS_TOKEN_IN | 2:                                                  //endpoint 2# 中断端点上传
             UEP2_T_LEN = 0;                                                     //预使用发送长度一定要清空
-//            UEP1_CTRL ^= bUEP_T_TOG;                                          //如果不设置自动翻转则需要手动翻转
+            UEP2_CTRL ^= bUEP_T_TOG;                                            //手动翻转
             UEP2_CTRL = UEP2_CTRL & ~ MASK_UEP_T_RES | UEP_T_RES_NAK;           //默认应答NAK
             break;
         case UIS_TOKEN_IN | 1:                                                  //endpoint 1# 中断端点上传
             UEP1_T_LEN = 0;                                                     //预使用发送长度一定要清空
-//            UEP2_CTRL ^= bUEP_T_TOG;                                          //如果不设置自动翻转则需要手动翻转
+            UEP1_CTRL ^= bUEP_T_TOG;                                            //手动翻转
             UEP1_CTRL = UEP1_CTRL & ~ MASK_UEP_T_RES | UEP_T_RES_NAK;           //默认应答NAK
             FLAG = 1;                                                           /*传输完成标志*/
             break;
         case UIS_TOKEN_SETUP | 0:                                               //SETUP事务
-            len = USB_RX_LEN;
+            UEP0_CTRL = bUEP_R_TOG | bUEP_T_TOG | UEP_R_RES_ACK | UEP_T_RES_ACK; 
+			len = USB_RX_LEN;
             if(len == (sizeof(USB_SETUP_REQ)))
             {
                 SetupLen = UsbSetupBuf->wLengthL;
@@ -420,8 +421,8 @@ void    DeviceInterrupt( void ) interrupt INT_NO_USB using 1                    
     if(UIF_BUS_RST)                                                                 //设备模式USB总线复位中断
     {
         UEP0_CTRL = UEP_R_RES_ACK | UEP_T_RES_NAK;
-        UEP1_CTRL = bUEP_AUTO_TOG | UEP_R_RES_ACK;
-        UEP2_CTRL = bUEP_AUTO_TOG | UEP_R_RES_ACK | UEP_T_RES_NAK;
+        UEP1_CTRL = UEP_T_RES_NAK;
+        UEP2_CTRL = UEP_T_RES_NAK;
         USB_DEV_AD = 0x00;
         UIF_SUSPEND = 0;
         UIF_TRANSFER = 0;
@@ -456,11 +457,11 @@ void    DeviceInterrupt( void ) interrupt INT_NO_USB using 1                    
 void HIDValueHandle()
 {
     UINT8 i;
-    if (RI)
+    if( RI )
     {
-        RI = 0;
-        i = getkey( );
-        printf( "%c", (UINT8)i );
+		RI = 0;
+		i = SBUF;
+        printf( "%c\n", (UINT8)i );
         switch(i)
         {
 //鼠标数据上传示例
@@ -468,22 +469,24 @@ void HIDValueHandle()
             HIDMouse[0] = 0x01;
             enp2IntIn();
             HIDMouse[0] = 0;
+			enp2IntIn();
             break;
         case 'R':                                                        //右键
             HIDMouse[0] = 0x02;
             enp2IntIn();
             HIDMouse[0] = 0;
+			enp2IntIn();
             break;
 //键盘数据上传示例
         case 'A':                                                         //A键
             FLAG = 0;
             HIDKey[2] = 0x04;                                             //按键开始
             enp1IntIn();
-            HIDKey[2] = 0;                                                //按键结束
-            while(FLAG == 0);                                             /*等待传输完成*/
-            enp1IntIn();
+			HIDKey[2] = 0;                                                //按键结束
+			while(FLAG == 0);                                             /*等待传输完成*/    
+			enp1IntIn();
             while(FLAG == 0);                                             /*等待传输完成*/				
-            break;
+			break;
         case 'P':                                                         //P键
             FLAG = 0;
             HIDKey[2] = 0x13;
@@ -531,7 +534,7 @@ main()
     {
         if(Ready)
         {
-            HIDValueHandle();
+			HIDValueHandle();
         }
         mDelaymS( 100 );                                                   //模拟单片机做其它事
     }

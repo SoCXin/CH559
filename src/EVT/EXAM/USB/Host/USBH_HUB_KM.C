@@ -1,16 +1,26 @@
 /********************************** (C) COPYRIGHT *******************************
-* File Name          : USBH_AOA.C
+* File Name          : USBH_HUB_KM.C
 * Author             : WCH
-* Version            : V1.0
-* Date               : 2018/08/01
+* Version            : V1.6
+* Date               : 2018/07/23
 * Description        :
  USB host example for CH559, start USB device under DP/DM and HP/HM port
- 支持安卓手机的配件模式（AOA）与通讯，配置手机APP实现双向数据收发，支持普通设备的枚举。
+ USB主机应用例子,初始化和枚举USB端口连接的设备,同时支持最多2个USB设备,支持一级外部HUB,
+ 可以操作USB键鼠和HUB,包含HID类命令处理
+ 不支持U盘操作，如果需要操作U盘，请参考其他例子
+ 支持简单USB打印机操作，没有处理USB打印机类命令
 *******************************************************************************/
 #include <CH559.H>
 #include <stdio.h>
 #include <string.h>
-
+//#define DISK_BASE_BUF_LEN     512 /* 默认的磁盘数据缓冲区大小为512字节(可以选择为2048甚至4096以支持某些大扇区的U盘),为0则禁止在本文件中定义缓冲区并由应用程序在pDISK_BASE_BUF中指定 */
+#define FOR_ROOT_UDISK_ONLY      1  // 只用于DP/DM端口的U盘文件操作(使用子程序库CH559UFI/X),不支持HUB下U盘操作
+//还需要添加LIB库文件
+//#define NO_DEFAULT_ACCESS_SECTOR      1       /* 禁止默认的磁盘扇区读写子程序,下面用自行编写的程序代替它 */
+//#define NO_DEFAULT_DISK_CONNECT       1       /* 禁止默认的检查磁盘连接子程序,下面用自行编写的程序代替它 */
+//#define NO_DEFAULT_FILE_ENUMER        1       /* 禁止默认的文件名枚举回调程序,下面用自行编写的程序代替它 */
+#include "..\..\USB_LIB\CH559UFI.H"
+#include "..\..\USB_LIB\CH559UFI.C"
 #pragma  NOAREGS
 // 各子程序返回状态码
 #define ERR_SUCCESS         0x00    // 操作成功
@@ -21,8 +31,6 @@
 #define ERR_USB_TRANSFER    0x20    /* NAK/STALL等更多错误码在0x20~0x2F */
 #define ERR_USB_UNSUPPORT   0xFB    /*不支持的USB设备*/
 #define ERR_USB_UNKNOWN     0xFE    /*设备操作出错*/
-#define ERR_AOA_PROTOCOL    0x41    /*协议版本出错 */ 
-
 /*获取设备描述符*/
 UINT8C  SetupGetDevDescr[] = { USB_REQ_TYP_IN, USB_GET_DESCRIPTOR, 0x00, USB_DESCR_TYP_DEVICE, 0x00, 0x00, sizeof( USB_DEV_DESCR ), 0x00 };
 /*获取配置描述符*/
@@ -41,29 +49,8 @@ UINT8C  SetupClrEndpStall[] = { USB_REQ_TYP_OUT | USB_REQ_RECIP_ENDP, USB_CLEAR_
 UINT8C  SetupGetHubDescr[] = { HUB_GET_HUB_DESCRIPTOR, HUB_GET_DESCRIPTOR, 0x00, USB_DESCR_TYP_HUB, 0x00, 0x00, sizeof( USB_HUB_DESCR ), 0x00 };
 /*获取HID设备报表描述符*/
 UINT8C  SetupGetHIDDevReport[] = { 0x81, USB_GET_DESCRIPTOR, 0x00, USB_DESCR_TYP_REPORT, 0x00, 0x00, 0x41, 0x00 };
-//AOA获取协议版本
-UINT8C  GetProtocol[] = { 0xc0,0x33,0x00,0x00,0x00,0x00,0x02,0x00 };
-//启动配件模式
-UINT8C  TouchAOAMode[] = { 0x40,0x35,0x00,0x00,0x00,0x00,0x00,0x00 };
-/* AOA相关数组定义 */
-UINT8C  Sendlen[]= {0,4,16,35,39,53,67};
-//字符串ID,与手机APP相关的字符串信息
-UINT8C  StringID[] = {'W','C','H',0x00,                                                                                //manufacturer name
-                      'W','C','H','U','A','R','T','D','e','m','o',0x00,                                   //model name
-                      0x57,0x43,0x48,0x20,0x41,0x63,0x63,0x65,0x73,0x73,0x6f,0x72,0x79,0x20,0x54,0x65,0x73,0x74,0x00,     //description
-                      '1','.','0',0x00 ,                                                                       //version
-                      0x68,0x74,0x74,0x70,0x3a,0x2f,0x2f,0x77,0x63,0x68,0x2e,0x63,0x6e,0,//URI
-                      0x57,0x43,0x48,0x41,0x63,0x63,0x65,0x73,0x73,0x6f,0x72,0x79,0x31,0x00                               //serial number
-                     };  
-//应用索引字符串命令
-UINT8C  SetStringID[]= {0x40,0x34,0x00,0x00,0x00,0x00,0x04,0x00,
-                        0x40,0x34,0x00,0x00,0x01,0x00,12,0x00,
-                        0x40,0x34,0x00,0x00,0x02,0x00,19,0x00,
-                        0x40,0x34,0x00,0x00,0x03,0x00,4,0x00,
-                        0x40,0x34,0x00,0x00,0x04,0x00,0x0E,0x00,
-                        0x40,0x34,0x00,0x00,0x05,0x00,0x0E,0x00
-                       };
-
+/*打印机类命令*/
+UINT8C  XPrinterReport[] = { 0xA1, 0, 0x00, 0, 0x00, 0x00, 0xF1, 0x03 };
 UINT8X  UsbDevEndp0Size;              /* USB设备的端点0的最大包尺寸 */
 /*USB设备相关信息表,CH559最多支持2个设备*/
 #define ROOT_DEV_DISCONNECT     0
@@ -72,17 +59,25 @@ UINT8X  UsbDevEndp0Size;              /* USB设备的端点0的最大包尺寸 */
 #define ROOT_DEV_SUCCESS        3
 #define DEV_TYPE_KEYBOARD   ( USB_DEV_CLASS_HID | 0x20 )
 #define DEV_TYPE_MOUSE      ( USB_DEV_CLASS_HID | 0x30 )
-#define DEF_AOA_DEVICE          0xF0
-
+UINT8 Set_Port = 0;
 struct _RootHubDev
 {
     UINT8   DeviceStatus;           // 设备状态,0-无设备,1-有设备但尚未初始化,2-有设备但初始化枚举失败,3-有设备且初始化枚举成功
     UINT8   DeviceAddress;          // 设备被分配的USB地址
     UINT8   DeviceSpeed;            // 0为低速,非0为全速
     UINT8   DeviceType;             // 设备类型
-	UINT16  DeviceVID;              // 设备VID
-	UINT16  DevicePID;              // 设备PID
-    UINT8   GpVar[4];               // 通用变量
+//  union {
+//      struct MOUSE {
+//      UINT8   MouseInterruptEndp;     // 鼠标中断端点号
+//      UINT8   MouseIntEndpTog;        // 鼠标中断端点的同步标志
+//      UINT8   MouseIntEndpSize;       // 鼠标中断端点的长度
+//      }
+//      struct PRINT {
+//      }
+//  }
+//.....    struct  _Endp_Attr   Endp_Attr[4];   //端点的属性,最多支持4个端点
+    UINT8   GpVar;                  // 通用变量
+    UINT8   GpVar1;                 // 通用变量1
 } xdata RootHubDev[2];
 #define HUB_MAX_PORTS   4
 /*
@@ -102,11 +97,9 @@ struct _DevOnHubPort
 //.....    struct  _Endp_Attr   Endp_Attr[4];   //端点的属性,最多支持4个端点
     UINT8   GpVar;                  // 通用变量
 } xdata DevOnHubPort[2][HUB_MAX_PORTS];  // 假定:不超过2个外部HUB,每个外部HUB不超过HUB_MAX_PORTS个端口(多了不管)
-
 UINT8X  RxBuffer[ MAX_PACKET_SIZE ] _at_ 0x0000 ;  // IN, must even address
 UINT8X  TxBuffer[ MAX_PACKET_SIZE ] _at_ 0x0040 ;  // OUT, must even address
 #define pSetupReq   ((PXUSB_SETUP_REQ)TxBuffer)
-UINT8X  COM_BUF[200];                              //开辟共享缓冲区，存放超过64字节的描述符
 bit     RootHubId;                 // 当前正在操作的root-hub端口号:0=HUB0,1=HUB1
 bit     FoundNewDev;
 #pragma NOAREGS
@@ -118,7 +111,7 @@ UINT8   AnalyzeRootHub( void );                        // 分析ROOT-HUB状态,处理R
 // 返回ERR_SUCCESS为没有情况,返回ERR_USB_CONNECT为检测到新连接,返回ERR_USB_DISCON为检测到断开
 void    SetHostUsbAddr( UINT8 addr );                  // 设置USB主机当前操作的USB设备地址
 void    SetUsbSpeed( UINT8 FullSpeed );                // 设置当前USB速度
-void    ResetRootHubPort( UINT8 RootHubIndex );        // 检测到设备后,复位相应端口的总线,为枚举设备准备,设置为默认为全速
+UINT8   ResetRootHubPort( UINT8 RootHubIndex );        // 检测到设备后,复位相应端口的总线,为枚举设备准备,设置为默认为全速
 UINT8   EnableRootHubPort( UINT8 RootHubIndex );       // 使能ROOT-HUB端口,相应的bUH_PORT_EN置1开启端口,设备断开可能导致返回失败
 void    SelectHubPort( UINT8 RootHubIndex, UINT8 HubPortIndex );// HubPortIndex=0选择操作指定的ROOT-HUB端口,否则选择操作指定的ROOT-HUB端口的外部HUB的指定端口
 UINT8   WaitUSB_Interrupt( void );                     // 等待USB中断
@@ -138,8 +131,6 @@ UINT8   HubGetPortStatus( UINT8 HubPortIndex );        // 查询HUB端口状态,返回在
 UINT8   HubSetPortFeature( UINT8 HubPortIndex, UINT8 FeatureSelt );  // 设置HUB端口特性
 UINT8   HubClearPortFeature( UINT8 HubPortIndex, UINT8 FeatureSelt );  // 清除HUB端口特性
 UINT8   AnalyzeHidIntEndp( PUINT8X buf );              // 从描述符中分析出HID中断端点的地址
-UINT8   AnalyzeBulkEndp( PUINT8X buf,UINT8 RootHubIndex ) ;//分析出RootHUB下的批量端点
-UINT8   TouchStartAOA(void);                           // 尝试启动AOA模式
 UINT8   InitRootDevice( UINT8 RootHubIndex );          // 初始化指定ROOT-HUB端口的USB设备
 // 输入: 内置HUB端口号0/1
 UINT8   EnumAllRootDevice( void );                     // 枚举所有ROOT-HUB端口的USB设备
@@ -341,35 +332,62 @@ void    SetUsbSpeed( UINT8 FullSpeed )
 * Output         : None
 * Return         : None
 *******************************************************************************/
-void    ResetRootHubPort( UINT8 RootHubIndex )
+UINT8   ResetRootHubPort( UINT8 RootHubIndex )
 {
-    UsbDevEndp0Size = DEFAULT_ENDP0_SIZE;                        //USB设备的端点0的最大包尺寸
+    UINT16 n = 30000;
+	UsbDevEndp0Size = DEFAULT_ENDP0_SIZE;                        //USB设备的端点0的最大包尺寸
     SetHostUsbAddr( 0x00 );
-	RootHubDev[ RootHubIndex ].DeviceAddress = 0x00;
-	if ( RootHubIndex == 1 )
-	{ 
-		UHUB1_CTRL = 0x00;                                      // 清除有关HUB1的控制数据,实际上不需要清除
-	}
-	else
-	{
-		UHUB0_CTRL = 0x00;                                       // 清除有关HUB0的控制数据,实际上不需要清除
-	}
 			
     SetUsbSpeed( 1 );                                            // 默认为全速
     if ( RootHubIndex == 1 )
     {
         UHUB1_CTRL = UHUB1_CTRL & ~ bUH_LOW_SPEED | bUH_BUS_RESET;// 默认为全速,开始复位
-        mDelaymS( 15 );                                          // 复位时间10mS到20mS
+		while( n )
+		{
+			++ SAFE_MOD;  												
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			if( USB_HUB_ST & ( bUHS_HP_PIN | bUHS_HM_PIN ) )
+			{
+				UHUB1_CTRL = UHUB1_CTRL & ~bUH_BUS_RESET;  						/* 结束复位 */
+				return( 0x01 );
+			}
+			--n;
+		}
         UHUB1_CTRL = UHUB1_CTRL & ~ bUH_BUS_RESET;               // 结束复位
     }
     else
     {
         UHUB0_CTRL = UHUB0_CTRL & ~ bUH_LOW_SPEED | bUH_BUS_RESET;// 默认为全速,开始复位
-        mDelaymS( 15 );                                          // 复位时间10mS到20mS
+        while( n ) 
+		{  
+			++ SAFE_MOD;  												
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			if( USB_HUB_ST & ( bUHS_DP_PIN | bUHS_DM_PIN ) )
+			{
+				UHUB0_CTRL = UHUB0_CTRL & ~bUH_BUS_RESET;  						/* 结束复位 */
+				return( 0x01 );
+			}
+			-- n;
+		}
         UHUB0_CTRL = UHUB0_CTRL & ~ bUH_BUS_RESET;               // 结束复位
     }
-    mDelayuS( 250 );
-    UIF_DETECT = 0;                                              // 清中断标志
+    mDelayuS( 200 );
+    UIF_DETECT = 0;											     // 清连接中断标志
+	return ( 0x00 );
 }
 /*******************************************************************************
 * Function Name  : EnableRootHubPort( UINT8 RootHubIndex )
@@ -479,7 +497,7 @@ UINT8   USBHostTransact( UINT8 endp_pid, UINT8 tog, UINT16 timeout )
 {
     UINT8   TransRetry;
 // #define TransRetry  UEP0_T_LEN                                    // 节约内存
-    UINT8  r;
+    UINT8   s, r;
     UINT16  i;
     UH_RX_CTRL = tog;
     UH_TX_CTRL =tog ;
@@ -610,7 +628,7 @@ UINT8   USBHostTransact( UINT8 endp_pid, UINT8 tog, UINT16 timeout )
                    ERR_SUCCESS     数据交换成功
                    其他错误状态
 *******************************************************************************/
-UINT8  HostCtrlTransfer( PUINT8 DataBuf, PUINT8 RetLen )
+UINT8   HostCtrlTransfer( PUINT8 DataBuf, PUINT8 RetLen )
 {
     UINT16  RemLen  = 0;
     UINT8   s, RxLen, RxCnt, TxCnt;
@@ -650,7 +668,8 @@ UINT8  HostCtrlTransfer( PUINT8 DataBuf, PUINT8 RetLen )
                 {
                     *pLen += RxLen;                             // 实际成功收发的总长度
                 }
-
+//              memcpy( pBuf, RxBuffer, RxLen );
+//              pBuf += RxLen;
                 for ( RxCnt = 0; RxCnt != RxLen; RxCnt ++ )
                 {
                     *pBuf = RxBuffer[ RxCnt ];
@@ -669,7 +688,14 @@ UINT8  HostCtrlTransfer( PUINT8 DataBuf, PUINT8 RetLen )
             {
                 mDelayuS( 200 );
                 UH_TX_LEN = RemLen >= UsbDevEndp0Size ? UsbDevEndp0Size : RemLen;
-
+//              memcpy( TxBuffer, pBuf, UH_TX_LEN );
+//              pBuf += UH_TX_LEN;
+                if(pBuf[1] == 0x09)                              //HID类命令处理
+                {
+                    Set_Port = Set_Port^1 ? 1:0;
+                    *pBuf = Set_Port;
+                    printf("SET_PORT  %02X  %02X ",(UINT16)(*pBuf),(UINT16)(Set_Port));
+                }
                 for ( TxCnt = 0; TxCnt != UH_TX_LEN; TxCnt ++ )
                 {
                     TxBuffer[ TxCnt ] = *pBuf;
@@ -736,12 +762,12 @@ UINT8   CtrlGetDeviceDescr( void )
     UINT8   len;
     UsbDevEndp0Size = DEFAULT_ENDP0_SIZE;
     CopySetupReqPkg( SetupGetDevDescr );
-    s = HostCtrlTransfer( COM_BUF, &len );                    // 执行控制传输
+    s = HostCtrlTransfer( TxBuffer, &len );                    // 执行控制传输
     if ( s != ERR_SUCCESS )
     {
         return( s );
     }
-    UsbDevEndp0Size = ( (PXUSB_DEV_DESCR)COM_BUF ) -> bMaxPacketSize0;// 端点0最大包长度,这是简化处理,正常应该先获取前8字节后立即更新UsbDevEndp0Size再继续
+    UsbDevEndp0Size = ( (PXUSB_DEV_DESCR)TxBuffer ) -> bMaxPacketSize0;// 端点0最大包长度,这是简化处理,正常应该先获取前8字节后立即更新UsbDevEndp0Size再继续
     if ( len < ( (PUSB_SETUP_REQ)SetupGetDevDescr ) -> wLengthL )
     {
         return( ERR_USB_BUF_OVER );                            // 描述符长度错误
@@ -762,7 +788,7 @@ UINT8   CtrlGetConfigDescr( void )
     UINT8   s;
     UINT8D  len;
     CopySetupReqPkg( SetupGetCfgDescr );
-    s = HostCtrlTransfer( COM_BUF, &len );                     // 执行控制传输
+    s = HostCtrlTransfer( TxBuffer, &len );                     // 执行控制传输
     if ( s != ERR_SUCCESS )
     {
         return( s );
@@ -771,15 +797,15 @@ UINT8   CtrlGetConfigDescr( void )
     {
         return( ERR_USB_BUF_OVER );                             // 返回长度错误
     }
-    len = ( (PXUSB_CFG_DESCR)COM_BUF ) -> wTotalLengthL;
+    len = ( (PXUSB_CFG_DESCR)TxBuffer ) -> wTotalLengthL;
     CopySetupReqPkg( SetupGetCfgDescr );
     pSetupReq -> wLengthL = len;                                // 完整配置描述符的总长度
-    s = HostCtrlTransfer( COM_BUF, &len );                      // 执行控制传输（此时可能超64字节，存放在COM_BUF中）
+    s = HostCtrlTransfer( TxBuffer, &len );                     // 执行控制传输
     if ( s != ERR_SUCCESS )
     {
         return( s );
     }
-    if ( len < ( (PUSB_SETUP_REQ)SetupGetCfgDescr ) -> wLengthL || len < ( (PXUSB_CFG_DESCR)COM_BUF ) -> wTotalLengthL )
+    if ( len < ( (PUSB_SETUP_REQ)SetupGetCfgDescr ) -> wLengthL || len < ( (PXUSB_CFG_DESCR)TxBuffer ) -> wTotalLengthL )
     {
         return( ERR_USB_BUF_OVER );                             // 描述符长度错误
     }
@@ -871,7 +897,7 @@ UINT8   CtrlClearEndpStall( UINT8 endp )
 * Return         : ERR_SUCCESS 成功
                    其他        错误
 *******************************************************************************/
-UINT8  CtrlGetHIDDeviceReport( void )
+UINT8   CtrlGetHIDDeviceReport( void )
 {
     UINT8   s;
     UINT8   len;
@@ -880,13 +906,13 @@ UINT8  CtrlGetHIDDeviceReport( void )
     {
         ((PUINT8X)pSetupReq)[ s ] = tmp[s];
     }
-    s = HostCtrlTransfer( COM_BUF, &len );                     // 执行控制传输
+    s = HostCtrlTransfer( TxBuffer, &len );                     // 执行控制传输
 //    if ( s != ERR_SUCCESS )
 //    {
 //        return( s );
 //    }
     CopySetupReqPkg( SetupGetHIDDevReport );
-    s = HostCtrlTransfer( COM_BUF, &len );                     // 执行控制传输
+    s = HostCtrlTransfer( TxBuffer, &len );                     // 执行控制传输
     if ( s != ERR_SUCCESS )
     {
         return( s );
@@ -995,7 +1021,31 @@ UINT8   HubClearPortFeature( UINT8 HubPortIndex, UINT8 FeatureSelt )
     pSetupReq -> wLengthH = 0x00;
     return( HostCtrlTransfer( NULL, NULL ) );  // 执行控制传输
 }
-
+/*******************************************************************************
+* Function Name  : CtrlGetXPrinterReport1
+* Description    : 打印机类命令
+* Input          : None
+* Output         : None
+* Return         : ERR_USB_BUF_OVER 描述符长度错误
+                   ERR_SUCCESS      成功
+                   其他
+*******************************************************************************/
+UINT8   CtrlGetXPrinterReport1( void )
+{
+    UINT8   s;
+    UINT16   len;
+    CopySetupReqPkg( XPrinterReport );
+    s = HostCtrlTransfer( TxBuffer, &len );                    // 执行控制传输
+    if ( s != ERR_SUCCESS )
+    {
+        return( s );
+    }
+    if ( len < ( (XPrinterReport[7]<<8)|(XPrinterReport[6]) ))
+    {
+        return( ERR_USB_BUF_OVER );                            // 描述符长度错误
+    }
+    return( ERR_SUCCESS );
+}
 /*******************************************************************************
 * Function Name  : AnalyzeHidIntEndp
 * Description    : 从描述符中分析出HID中断端点的地址
@@ -1024,79 +1074,6 @@ UINT8   AnalyzeHidIntEndp( PUINT8X buf )
     }
     return( s );
 }
-
-/*******************************************************************************
-* Function Name  : AnalyzeBulkEndp,仅用于分析RootHub
-* Description    : 分析出批量端点,GpVar[0]、GpVar[1]存放上传端点。GpVar[2]、GpVar[3]存放下传端点
-* Input          : buf：待分析数据缓冲区地址   HubPortIndex：0表示根HUB，非0表示外部HUB下的端口号
-* Output         : None
-* Return         : 0
-*******************************************************************************/
-UINT8   AnalyzeBulkEndp( PUINT8X buf,UINT8 RootHubIndex ) 
-{
-    UINT8   i, s1,s2, l;
-    s1 = 0;s2 = 2;
-
-	memset( RootHubDev[RootHubIndex].GpVar,0,sizeof(RootHubDev[RootHubIndex].GpVar) );  //清空数组
-
-    for ( i = 0; i < ( (PXUSB_CFG_DESCR)buf ) -> wTotalLengthL; i += l )       // 搜索中断端点描述符,跳过配置描述符和接口描述符
-    {
-        if ( (( (PXUSB_ENDP_DESCR)(buf+i) ) -> bDescriptorType == USB_DESCR_TYP_ENDP)     // 是端点描述符
-                && ((( (PXUSB_ENDP_DESCR)(buf+i) ) -> bmAttributes & USB_ENDP_TYPE_MASK ) == USB_ENDP_TYPE_BULK))  // 是批量
-
-        {
-
-			if(( (PXUSB_ENDP_DESCR)(buf+i) ) -> bEndpointAddress & USB_ENDP_DIR_MASK )
-				RootHubDev[RootHubIndex].GpVar[s1++] = ( (PXUSB_ENDP_DESCR)(buf+i) ) -> bEndpointAddress & USB_ENDP_ADDR_MASK;
-			else
-				RootHubDev[RootHubIndex].GpVar[s2++] = ( (PXUSB_ENDP_DESCR)(buf+i) ) -> bEndpointAddress & USB_ENDP_ADDR_MASK;
-	
-			if(s1 == 2) s1 = 1;
-			if(s2 == 4) s2 = 3;			
-		}
-        l = ( (PXUSB_ENDP_DESCR)(buf+i) ) -> bLength;                          // 当前描述符长度,跳过
-        if ( l > 16 )
-        {
-            break;
-        }
-    }
-    return( 0 );
-}
-
-//尝试启动AOA模式
-UINT8 TouchStartAOA(void)
-{
-	UINT8 len,s,i,Num;
-    //获取协议版本号
-    CopySetupReqPkg( GetProtocol );
-    s = HostCtrlTransfer( COM_BUF, &len );  // 执行控制传输
-    if ( s != ERR_SUCCESS )
-    {
-        return( s );
-    }
-	if(COM_BUF[0]<2) return  ERR_AOA_PROTOCOL;
-
-    //输出字符串
-    for(i=0; i<6; i++)
-    {
-        Num=Sendlen[i];
-        CopySetupReqPkg(&SetStringID[8*i]);
-        s = HostCtrlTransfer( &StringID[Num], &len );  // 执行控制传输
-        if ( s != ERR_SUCCESS )
-        {
-            return( s );
-        }
-    }	
-
-    CopySetupReqPkg(TouchAOAMode);
-    s = HostCtrlTransfer( COM_BUF, &len );  // 执行控制传输
-    if ( s != ERR_SUCCESS )
-    {
-        return( s );
-    }
-    return ERR_SUCCESS;	
-}
-
 /*******************************************************************************
 * Function Name  : InitRootDevice
 * Description    : 初始化指定ROOT-HUB端口的USB设备
@@ -1107,14 +1084,13 @@ UINT8 TouchStartAOA(void)
 UINT8   InitRootDevice( UINT8 RootHubIndex )
 {
     UINT8   i, s, cfg, dv_cls, if_cls;
-	UINT8  touchaoatm = 0;
     UINT8  retry=0;
     printf( "Reset root hub %1d# port\n", (UINT16)RootHubIndex );
     while(retry<10)
     {
         mDelaymS( 100*retry );
         retry++;
-        ResetRootHubPort( RootHubIndex );                              // 检测到设备后,复位相应端口的USB总线
+        ResetRootHubPort( RootHubIndex );                    // 检测到设备后,复位相应端口的USB总线
         for ( i = 0, s = 0; i < 100; i ++ )                            // 等待USB设备复位后重新连接,100mS超时
         {
             mDelaymS( 1 );
@@ -1142,13 +1118,10 @@ UINT8   InitRootDevice( UINT8 RootHubIndex )
         {
             for ( i = 0; i < ( (PUSB_SETUP_REQ)SetupGetDevDescr ) -> wLengthL; i ++ )
             {
-                printf( "x%02X ", (UINT16)( COM_BUF[i] ) );
+                printf( "x%02X ", (UINT16)( TxBuffer[i] ) );
             }
             printf( "\n" );                                            // 显示出描述符
-			
-			RootHubDev[RootHubIndex].DeviceVID=(((UINT16)((PXUSB_DEV_DESCR)COM_BUF)->idVendorH)<<8 ) + ((PXUSB_DEV_DESCR)COM_BUF)->idVendorL; //保存VID PID信息
-			RootHubDev[RootHubIndex].DevicePID=(((UINT16)((PXUSB_DEV_DESCR)COM_BUF)->idProductH)<<8 ) + ((PXUSB_DEV_DESCR)COM_BUF)->idProductL;
-            dv_cls = ( (PXUSB_DEV_DESCR)COM_BUF ) -> bDeviceClass;    // 设备类代码
+            dv_cls = ( (PXUSB_DEV_DESCR)TxBuffer ) -> bDeviceClass;    // 设备类代码
             s = CtrlSetUsbAddress( RootHubIndex + ( (PUSB_SETUP_REQ)SetupSetUsbAddr ) -> wValueL );// 设置USB设备地址,加上RootHubIndex可以保证2个HUB端口分配不同的地址
             if ( s == ERR_SUCCESS )
             {
@@ -1157,14 +1130,14 @@ UINT8   InitRootDevice( UINT8 RootHubIndex )
                 s = CtrlGetConfigDescr( );                             // 获取配置描述符
                 if ( s == ERR_SUCCESS )
                 {
-                    cfg = ( (PXUSB_CFG_DESCR)COM_BUF ) -> bConfigurationValue;
-                    for ( i = 0; i < ( (PXUSB_CFG_DESCR)COM_BUF ) -> wTotalLengthL; i ++ )
+                    cfg = ( (PXUSB_CFG_DESCR)TxBuffer ) -> bConfigurationValue;
+                    for ( i = 0; i < ( (PXUSB_CFG_DESCR)TxBuffer ) -> wTotalLengthL; i ++ )
                     {
-                        printf( "x%02X ", (UINT16)( COM_BUF[i] ) );
+                        printf( "x%02X ", (UINT16)( TxBuffer[i] ) );
                     }
                     printf("\n");
                     //分析配置描述符,获取端点数据/各端点地址/各端点大小等,更新变量endp_addr和endp_size等
-                    if_cls = ( (PXUSB_CFG_DESCR_LONG)COM_BUF ) -> itf_descr.bInterfaceClass;  // 接口类代码
+                    if_cls = ( (PXUSB_CFG_DESCR_LONG)TxBuffer ) -> itf_descr.bInterfaceClass;  // 接口类代码
                     if ( dv_cls == 0x00 && if_cls == USB_DEV_CLASS_STORAGE )// 是USB存储类设备,基本上确认是U盘
                     {
                         s = CtrlSetUsbConfig( cfg );                   // 设置USB设备配置
@@ -1177,11 +1150,49 @@ UINT8   InitRootDevice( UINT8 RootHubIndex )
                             return( ERR_SUCCESS );
                         }
                     }
-                    else if ( dv_cls == 0x00 && if_cls == USB_DEV_CLASS_HID && ( (PXUSB_CFG_DESCR_LONG)COM_BUF ) -> itf_descr.bInterfaceSubClass <= 0x01 )// 是HID类设备,键盘/鼠标等
+                    else if ( dv_cls == 0x00 && if_cls == USB_DEV_CLASS_PRINTER && ( (PXUSB_CFG_DESCR_LONG)TxBuffer ) -> itf_descr.bInterfaceSubClass == 0x01 )// 是打印机类设备
                     {
-                        s = AnalyzeHidIntEndp( COM_BUF );             // 从描述符中分析出HID中断端点的地址
-                        RootHubDev[RootHubIndex].GpVar[0] = s & USB_ENDP_ADDR_MASK ;// 保存中断端点的地址,位7用于同步标志位,清0
-                        if_cls = ( (PXUSB_CFG_DESCR_LONG)COM_BUF ) -> itf_descr.bInterfaceProtocol;
+                        printf( "USB-Print OK\n" );
+                        if((TxBuffer[19] == 5)&&(TxBuffer[20]&&0x80))
+                        {
+                            RootHubDev[RootHubIndex].GpVar = TxBuffer[20];//IN 端点
+                        }
+                        else if((TxBuffer[19] == 5)&&((TxBuffer[20]&&0x80) == 0))
+                        {
+                            RootHubDev[RootHubIndex].GpVar1 = TxBuffer[20];//OUT 端点
+                        }
+                        if((TxBuffer[26] == 5)&&(TxBuffer[20]&&0x80))
+                        {
+                            RootHubDev[RootHubIndex].GpVar = TxBuffer[27];//IN 端点
+                        }
+                        else if((TxBuffer[26] == 5)&&((TxBuffer[20]&&0x80) == 0))
+                        {
+                            RootHubDev[RootHubIndex].GpVar1 = TxBuffer[27];//OUT 端点
+                        }
+//                  RootHubDev[RootHubIndex].GpVar = ( (PUSB_CFG_DESCR_LONG)TxBuffer ) -> endp_descr[0].bEndpointAddress;// 保存批量传输端点
+                        s = CtrlSetUsbConfig( cfg );                   // 设置USB设备配置
+                        if ( s == ERR_SUCCESS )
+                        {
+                            s = CtrlSetUsbIntercace(cfg);
+//                         if(s == ERR_SUCCESS){
+                            //需保存端点信息以便主程序进行USB传输
+                            s = CtrlGetXPrinterReport1( );            //打印机类命令
+                            if(s == ERR_SUCCESS)
+                            {
+                                RootHubDev[RootHubIndex].DeviceStatus = ROOT_DEV_SUCCESS;
+                                RootHubDev[RootHubIndex].DeviceType = USB_DEV_CLASS_PRINTER;
+                                printf( "USB-Print Ready\n" );
+                                SetUsbSpeed( 1 );                          // 默认为全速
+                                return( ERR_SUCCESS );
+                            }
+//                         }
+                        }
+                    }
+                    else if ( dv_cls == 0x00 && if_cls == USB_DEV_CLASS_HID && ( (PXUSB_CFG_DESCR_LONG)TxBuffer ) -> itf_descr.bInterfaceSubClass <= 0x01 )// 是HID类设备,键盘/鼠标等
+                    {
+                        s = AnalyzeHidIntEndp( TxBuffer );             // 从描述符中分析出HID中断端点的地址
+                        RootHubDev[RootHubIndex].GpVar = s & USB_ENDP_ADDR_MASK ;// 保存中断端点的地址,位7用于同步标志位,清0
+                        if_cls = ( (PXUSB_CFG_DESCR_LONG)TxBuffer ) -> itf_descr.bInterfaceProtocol;
                         s = CtrlSetUsbConfig( cfg );                   // 设置USB设备配置
                         printf( "HID: %02x",(UINT16)s );
                         if ( s == ERR_SUCCESS )
@@ -1192,7 +1203,7 @@ UINT8   InitRootDevice( UINT8 RootHubIndex )
                             {
                                 for ( i = 0; i < 64; i++ )
                                 {
-                                    printf( "x%02X ", (UINT16)( COM_BUF[i] ) );
+                                    printf( "x%02X ", (UINT16)( TxBuffer[i] ) );
                                 }
                                 printf("\n");
                             }
@@ -1221,8 +1232,8 @@ UINT8   InitRootDevice( UINT8 RootHubIndex )
                     }
                     else if ( dv_cls == USB_DEV_CLASS_HUB )           // 是HUB类设备,集线器等
                     {
-                        s = AnalyzeHidIntEndp( COM_BUF );            // 从描述符中分析出HID中断端点的地址
-                        RootHubDev[RootHubIndex].GpVar[1] = s & USB_ENDP_ADDR_MASK ;// 保存中断端点的地址,位7用于同步标志位,清0
+                        s = AnalyzeHidIntEndp( TxBuffer );            // 从描述符中分析出HID中断端点的地址
+                        RootHubDev[RootHubIndex].GpVar1 = s & USB_ENDP_ADDR_MASK ;// 保存中断端点的地址,位7用于同步标志位,清0
                         printf( "GetHubDescr: ");
                         s = CtrlGetHubDescr( );
                         if ( s == ERR_SUCCESS )
@@ -1232,10 +1243,10 @@ UINT8   InitRootDevice( UINT8 RootHubIndex )
                                 printf( "x%02X ",(UINT16)(TxBuffer[i]) );
                             }
                             printf("\n");
-                            RootHubDev[RootHubIndex].GpVar[0] = ( (PXUSB_HUB_DESCR)TxBuffer ) -> bNbrPorts;// 保存HUB的端口数量
-                            if ( RootHubDev[RootHubIndex].GpVar[0] > HUB_MAX_PORTS )
+                            RootHubDev[RootHubIndex].GpVar = ( (PXUSB_HUB_DESCR)TxBuffer ) -> bNbrPorts;// 保存HUB的端口数量
+                            if ( RootHubDev[RootHubIndex].GpVar > HUB_MAX_PORTS )
                             {
-                                RootHubDev[RootHubIndex].GpVar[0] = HUB_MAX_PORTS;// 因为定义结构DevOnHubPort时人为假定每个HUB不超过HUB_MAX_PORTS个端口
+                                RootHubDev[RootHubIndex].GpVar = HUB_MAX_PORTS;// 因为定义结构DevOnHubPort时人为假定每个HUB不超过HUB_MAX_PORTS个端口
                             }
                             //if ( ( (PXUSB_HUB_DESCR)TxBuffer ) -> wHubCharacteristics[0] & 0x04 ) printf("带有集线器的复合设备\n");
                             //else printf("单一的集线器产品\n");
@@ -1246,7 +1257,7 @@ UINT8   InitRootDevice( UINT8 RootHubIndex )
                                 RootHubDev[RootHubIndex].DeviceType = USB_DEV_CLASS_HUB;
                                 //需保存端点信息以便主程序进行USB传输,本来中断端点可用于HUB事件通知,但本程序使用查询状态控制传输代替
                                 //给HUB各端口上电,查询各端口状态,初始化有设备连接的HUB端口,初始化设备
-                                for ( i = 1; i <= RootHubDev[RootHubIndex].GpVar[0]; i ++ )// 给HUB各端口都上电
+                                for ( i = 1; i <= RootHubDev[RootHubIndex].GpVar; i ++ )// 给HUB各端口都上电
                                 {
                                     DevOnHubPort[RootHubIndex][i-1].DeviceStatus = ROOT_DEV_DISCONNECT;  // 清外部HUB端口上设备的状态
                                     s = HubSetPortFeature( i, HUB_PORT_POWER );
@@ -1255,7 +1266,7 @@ UINT8   InitRootDevice( UINT8 RootHubIndex )
                                         printf( "Ext-HUB Port_%1d# power on error\n",(UINT16)i );// 端口上电失败
                                     }
                                 }
-//                             for ( i = 1; i <= RootHubDev[RootHubIndex].GpVar[0]; i ++ ) // 清除HUB各端口连接状态
+//                             for ( i = 1; i <= RootHubDev[RootHubIndex].GpVar; i ++ ) // 清除HUB各端口连接状态
 //                             {
 //                                 s = HubClearPortFeature( i, HUB_C_PORT_CONNECTION );
 //                                 if ( s != ERR_SUCCESS )
@@ -1263,61 +1274,41 @@ UINT8   InitRootDevice( UINT8 RootHubIndex )
 //                                     printf( "Ext-HUB Port_%1d#  clear connection error\n",(UINT16)i );// 端口连接状态清除失败
 //                                 }
 //                             }
-                                for ( i = 1; i <= RootHubDev[RootHubIndex].GpVar[0]; i ++ ) // 查询HUB各端口连接状态
+                                for ( i = 1; i <= RootHubDev[RootHubIndex].GpVar; i ++ ) // 查询HUB各端口连接状态
                                 {
                                     s = HubGetPortStatus( i );  // 获取端口状态
                                     if ( s != ERR_SUCCESS )
                                     {
                                         printf( "Ext-HUB Port_%1d#	clear connection error\n",(UINT16)i );    // 端口连接状态清除失败
                                     }
+//                                                          if ( ( TxBuffer[0] != 0 ) && ( DevOnHubPort[RootHubIndex][i-1].DeviceStatus != ROOT_DEV_SUCCESS) ){ //HUB下游端口已有设备连接
+//                                                          s = HubSetPortFeature( i, HUB_PORT_RESET );  // 对有设备连接的端口复位
+//                                                          if ( s != ERR_SUCCESS ) continue;
+// //                                                           return s;  // 可能是该HUB断开了
+//                                                          do // 查询复位端口,直到复位完成,把完成后的状态显示出来
+//                                                          {
+//                                                              mDelaymS( 1 );
+//                                                              s = HubGetPortStatus( i );
+//                                                              if ( s != ERR_SUCCESS ) continue;//return s;  // 可能是该HUB断开了
+//                                                          } while ( TxBuffer[0] & (1<<(HUB_PORT_RESET&0x07)) );  // 端口正在复位则等待
+//                                                       }
                                 }
                                 SetUsbSpeed( 1 );                                        // 默认为全速
                                 return( ERR_SUCCESS );
                             }
                         }
                     }
-                    else                                                                 // 可以进一步分析,可能是手机
+                    else                                                                 // 可以进一步分析
                     {
-                        printf("dv_cls=%02x,if_cls =%02x\n",(UINT16)dv_cls,(UINT16)if_cls);
-						AnalyzeBulkEndp(COM_BUF , RootHubIndex );
-						for(i=0;i!=4;i++)
-						{
-							printf("%02x ",(UINT16)RootHubDev[RootHubIndex].GpVar[i] );
-						}
-						printf("\n");						
-
-						s = CtrlSetUsbConfig( cfg );                                     // 设置USB设备配置
+                        printf("dv_cls=%02x,if_cls =%02x",(UINT16)dv_cls,(UINT16)if_cls);
+                        s = CtrlSetUsbConfig( cfg );                                     // 设置USB设备配置
                         if ( s == ERR_SUCCESS )
                         {
-							printf("vid pid:%02x %02x\n",(UINT16)RootHubDev[RootHubIndex].DeviceVID,(UINT16)RootHubDev[RootHubIndex].DevicePID);
-						
-							if((RootHubDev[RootHubIndex].DeviceVID==0x18D1)&&(RootHubDev[RootHubIndex].DevicePID&0xff00)==0x2D00)   //如果是AOA配件
-							{
-								printf("AOA Mode\n");
-								RootHubDev[RootHubIndex].DeviceStatus = ROOT_DEV_SUCCESS;
-								RootHubDev[RootHubIndex].DeviceType = DEF_AOA_DEVICE;        //这只是自定义的变量类，不属于USB协议类
-								SetUsbSpeed( 1 );                                            // 默认为全速
-								return( ERR_SUCCESS );
-							}
-							else   //如果不是AOA 配件模式，尝试启动配件模式.
-							{
-								s = TouchStartAOA();
-								if( s == ERR_SUCCESS ) 
-								{
-									if(touchaoatm<3)         //尝试AOA启动次数限制
-									{
-										touchaoatm++;
-										mDelaymS(500);      //部分安卓设备自动断开重连，所以此处最好有延时
-										continue;           //其实这里可以不用跳转，AOA协议规定，设备会自动重新接入总线。
-									}
-									//执行到这，说明可能不支持AOA，或是其他设备
-									RootHubDev[RootHubIndex].DeviceType = dv_cls ? dv_cls : if_cls;
-									RootHubDev[RootHubIndex].DeviceStatus = ROOT_DEV_SUCCESS;
-									SetUsbSpeed( 1 );                                            // 默认为全速
-									return( ERR_SUCCESS );                                       // 未知设备初始化成功									
-								}							
-							}							
-
+                            //需保存端点信息以便主程序进行USB传输
+                            RootHubDev[RootHubIndex].DeviceStatus = ROOT_DEV_SUCCESS;
+                            RootHubDev[RootHubIndex].DeviceStatus = dv_cls ? dv_cls : if_cls;
+                            SetUsbSpeed( 1 );                                            // 默认为全速
+                            return( ERR_SUCCESS );                                       // 未知设备初始化成功
                         }
                     }
                 }
@@ -1380,7 +1371,7 @@ UINT8   InitDevOnHub( UINT8 RootHubIndex, UINT8 HubPortIndex )
     {
         return( s );
     }
-    dv_cls = ( (PXUSB_DEV_DESCR)COM_BUF ) -> bDeviceClass;                           // 设备类代码
+    dv_cls = ( (PXUSB_DEV_DESCR)TxBuffer ) -> bDeviceClass;                           // 设备类代码
     cfg = ( (RootHubIndex+1)<<4 ) + HubPortIndex;                                     // 计算出一个USB地址,避免地址重叠
     s = CtrlSetUsbAddress( cfg );                                                     // 设置USB设备地址
     if ( s != ERR_SUCCESS )
@@ -1394,14 +1385,14 @@ UINT8   InitDevOnHub( UINT8 RootHubIndex, UINT8 HubPortIndex )
     {
         return( s );
     }
-    cfg = ( (PXUSB_CFG_DESCR)COM_BUF ) -> bConfigurationValue;
-    for ( i = 0; i < ( (PXUSB_CFG_DESCR)COM_BUF ) -> wTotalLengthL; i ++ )
+    cfg = ( (PXUSB_CFG_DESCR)TxBuffer ) -> bConfigurationValue;
+    for ( i = 0; i < ( (PXUSB_CFG_DESCR)TxBuffer ) -> wTotalLengthL; i ++ )
     {
-        printf( "x%02X ", (UINT16)( COM_BUF[i] ) );
+        printf( "x%02X ", (UINT16)( TxBuffer[i] ) );
     }
     printf("\n");
     /* 分析配置描述符,获取端点数据/各端点地址/各端点大小等,更新变量endp_addr和endp_size等 */
-    if_cls = ( (PXUSB_CFG_DESCR_LONG)COM_BUF ) -> itf_descr.bInterfaceClass;         // 接口类代码
+    if_cls = ( (PXUSB_CFG_DESCR_LONG)TxBuffer ) -> itf_descr.bInterfaceClass;         // 接口类代码
     if ( dv_cls == 0x00 && if_cls == USB_DEV_CLASS_STORAGE )                          // 是USB存储类设备,基本上确认是U盘
     {
         s = CtrlSetUsbConfig( cfg );                                                  // 设置USB设备配置
@@ -1414,11 +1405,11 @@ UINT8   InitDevOnHub( UINT8 RootHubIndex, UINT8 HubPortIndex )
             return( ERR_SUCCESS );
         }
     }
-    else if ( dv_cls == 0x00 && if_cls == USB_DEV_CLASS_HID && ( (PXUSB_CFG_DESCR_LONG)COM_BUF ) -> itf_descr.bInterfaceSubClass <= 0x01 )    // 是HID类设备,键盘/鼠标等
+    else if ( dv_cls == 0x00 && if_cls == USB_DEV_CLASS_HID && ( (PXUSB_CFG_DESCR_LONG)TxBuffer ) -> itf_descr.bInterfaceSubClass <= 0x01 )    // 是HID类设备,键盘/鼠标等
     {
-        s = AnalyzeHidIntEndp( COM_BUF );                                            // 从描述符中分析出HID中断端点的地址
+        s = AnalyzeHidIntEndp( TxBuffer );                                            // 从描述符中分析出HID中断端点的地址
         DevOnHubPort[RootHubIndex][HubPortIndex-1].GpVar = s;                         // 保存中断端点的地址,位7用于同步标志位,清0
-        if_cls = ( (PXUSB_CFG_DESCR_LONG)COM_BUF ) -> itf_descr.bInterfaceProtocol;
+        if_cls = ( (PXUSB_CFG_DESCR_LONG)TxBuffer ) -> itf_descr.bInterfaceProtocol;
         s = CtrlSetUsbConfig( cfg );                                                  // 设置USB设备配置
         if ( s == ERR_SUCCESS )
         {
@@ -1483,7 +1474,7 @@ UINT8   EnumHubPort( UINT8 RootHubIndex )
 {
     UINT8   i, s;
     printf( "EnumHubPort\n" );
-    for ( i = 1; i <= RootHubDev[RootHubIndex].GpVar[0]; i ++ )                          // 查询集线器的端口是否有变化
+    for ( i = 1; i <= RootHubDev[RootHubIndex].GpVar; i ++ )                          // 查询集线器的端口是否有变化
     {
         SelectHubPort( RootHubIndex, 0 );                                             // 选择操作指定的ROOT-HUB端口,设置当前USB速度以及被操作设备的USB地址
         s = HubGetPortStatus( i );                                                    // 获取端口状态
@@ -1604,7 +1595,7 @@ UINT8   EnumAllHubPort( void )
         {
             SelectHubPort( RootHubIndex, 0 );                                         // 选择操作指定的ROOT-HUB端口,设置当前USB速度以及被操作设备的USB地址
             //做点什么?  给HUB各端口上电,查询各端口状态,初始化有设备连接的HUB端口,初始化设备
-//             for ( i = 1; i <= RootHubDev[RootHubIndex].GpVar[0]; i ++ ){                 // 初始化HUB各端口
+//             for ( i = 1; i <= RootHubDev[RootHubIndex].GpVar; i ++ ){                 // 初始化HUB各端口
 //               s = HubSetPortFeature( i, HUB_PORT_POWER );                             // 给HUB各端口上电
 //               if ( s != ERR_SUCCESS )
 //               {
@@ -1640,7 +1631,7 @@ UINT16  SearchTypeDevice( UINT8 type )
         }
         if ( RootHubDev[RootHubIndex].DeviceType == USB_DEV_CLASS_HUB && RootHubDev[RootHubIndex].DeviceStatus >= ROOT_DEV_SUCCESS )// 外部集线器HUB且枚举成功
         {
-            for ( HubPortIndex = 1; HubPortIndex <= RootHubDev[RootHubIndex].GpVar[0]; HubPortIndex ++ )// 搜索外部HUB的各个端口
+            for ( HubPortIndex = 1; HubPortIndex <= RootHubDev[RootHubIndex].GpVar; HubPortIndex ++ )// 搜索外部HUB的各个端口
             {
                 if ( DevOnHubPort[RootHubIndex][HubPortIndex-1].DeviceType == type && DevOnHubPort[RootHubIndex][HubPortIndex-1].DeviceStatus >= ROOT_DEV_SUCCESS )
                 {
@@ -1704,16 +1695,67 @@ void    InitUSB_Host( void )
     USB_INT_EN = bUIE_TRANSFER | bUIE_DETECT;
 //  IE_USB = 1;                                                                     // 查询方式
 }
-
-
+/*******************************************************************************
+* Function Name  : SETorOFFNumLock
+* Description    : NumLock的点灯判断
+* Input          : PUINT8 buf 点灯键值
+* Output         : None
+* Return         : None
+*******************************************************************************/
+UINT8 SETorOFFNumLock(PUINT8 buf)
+{
+    UINT8 tmp[]= {0x21,0x09,0x00,0x02,0x00,0x00,0x01,0x00};
+    UINT8 len,s;
+    if((buf[2]==0x53)&(buf[0]|buf[1]|buf[3]|buf[4]|buf[5]|buf[6]|buf[7]==0))
+    {
+        for ( s = 0; s != sizeof( tmp ); s ++ )
+        {
+            ((PUINT8X)pSetupReq)[ s ] = tmp[s];
+        }
+        s = HostCtrlTransfer( TxBuffer, &len );                                     // 执行控制传输
+        if ( s != ERR_SUCCESS )
+        {
+            return( s );
+        }
+    }
+    return( ERR_SUCCESS );
+}
+/*******************************************************************************
+* Function Name  : mStopIfError
+* Description    : 检查操作状态,如果错误则显示错误代码并停机
+* Input          : UINT8 iError
+* Output         : None
+* Return         : None
+*******************************************************************************/
+void    mStopIfError( UINT8 iError )
+{
+    if ( iError == ERR_SUCCESS )
+    {
+        return;                                                // 操作成功
+    }
+    printf( "Error: %02X\n", (UINT16)iError );                 // 显示错误
+    /* 遇到错误后,应该分析错误码以及CH559DiskStatus状态,例如调用CH559DiskReady查询当前U盘是否连接,如果U盘已断开那么就重新等待U盘插上再操作,
+       建议出错后的处理步骤:
+       1、调用一次CH559DiskReady,成功则继续操作,例如Open,Read/Write等
+       2、如果CH559DiskReady不成功,那么强行将从头开始操作(等待U盘连接，CH559DiskReady等) */
+    while ( 1 )
+    {
+//      LED_TMP=0;                                             // LED闪烁
+//      mDelaymS( 100 );
+//      LED_TMP=1;
+//      mDelaymS( 100 );
+    }
+}
 main( )
 {
-    UINT8   i,k,s, len, endp,HUBFlag;
-    UINT16  loc;
+    UINT8   i, c,s, len, endp,HUBFlag;
+    UINT16  loc,TotalCount;
+    UINT8  buf[100];                                           //长度可以根据应用自己指定
     HUBFlag = 0;
     mInitSTDIO( );                                                                  //为了让计算机通过串口监控演示过程
     printf( "Start @ChipID=%02X\n", (UINT16)CHIP_ID );
     InitUSB_Host( );
+    CH559LibInit( );                                           //初始化CH559程序库以支持U盘文件
     FoundNewDev = 0;
     printf( "Wait Device In\n" );
     while ( 1 )
@@ -1738,14 +1780,17 @@ main( )
                 printf( "EnumAllRootDev err = %02X\n", (UINT16)s );
             }
         }
-        loc = SearchTypeDevice( DEF_AOA_DEVICE );                               // 在ROOT-HUB以及外部HUB各端口上搜索指定类型的设备所在的端口号
+        loc = SearchTypeDevice( DEV_TYPE_MOUSE );                               // 在ROOT-HUB以及外部HUB各端口上搜索指定类型的设备所在的端口号
         if ( loc != 0xFFFF )                                                    // 找到了,如果有两个MOUSE如何处理?
         {
+            printf( "Query Mouse @%04X\n", loc );
             i = (UINT8)( loc >> 8 );
             len = (UINT8)loc;
             SelectHubPort( i, len );                                            // 选择操作指定的ROOT-HUB端口,设置当前USB速度以及被操作设备的USB地址
-            endp = len ? DevOnHubPort[i][len-1].GpVar : RootHubDev[i].GpVar[0];    // 找到IN端点
-
+            endp = len ? DevOnHubPort[i][len-1].GpVar : RootHubDev[i].GpVar;    // 中断端点的地址,位7用于同步标志位
+//                 printf( "DevOnHubPort @%02X\n", (UINT16)DevOnHubPort[i][len-1].GpVar );
+//                 printf( "RootHubDev @%04X\n", (UINT16)RootHubDev[i].GpVar );
+//                 mDelaymS(1);
             if ( endp & USB_ENDP_ADDR_MASK )                                    // 端点有效
             {
                 s = USBHostTransact( USB_PID_IN << 4 | endp & 0x7F, endp & 0x80 ? bUH_R_TOG | bUH_T_TOG : 0, 0 );// CH559传输事务,获取数据,NAK不重试
@@ -1758,43 +1803,340 @@ main( )
                     }
                     else
                     {
-                        RootHubDev[i].GpVar[0] = endp;
+                        RootHubDev[i].GpVar = endp;
                     }
                     len = USB_RX_LEN;                                           // 接收到的数据长度
                     if ( len )
                     {
-                        printf("recv data: ");
-                        for ( k = 0; k < len; k ++ )
+                        printf("Mouse data: ");
+                        for ( i = 0; i < len; i ++ )
                         {
-                            printf("x%02X ",(UINT16)(RxBuffer[k]) );
+                            printf("x%02X ",(UINT16)(RxBuffer[i]) );
                         }
                         printf("\n");
                     }
-					
-					//回传数据
-					memcpy(TxBuffer,RxBuffer,len);                            //回传
-					endp = RootHubDev[i].GpVar[2];                            //下传端点发OUT包
-					UH_TX_LEN = len; 
-					s = USBHostTransact( USB_PID_OUT << 4 | endp & 0x7F, endp & 0x80 ? bUH_R_TOG | bUH_T_TOG : 0, 0xffff ); //无限次重试下传
-					if(s == ERR_SUCCESS)
-					{
-						endp ^= 0x80;                                       // 同步标志翻转  
-						RootHubDev[i].GpVar[2] = endp;                         // 保存同步标志位						
-						printf("send back\n");
-					}					
-
                 }
                 else if ( s != ( USB_PID_NAK | ERR_USB_TRANSFER ) )
                 {
-                    printf("transmit error %02x\n",(UINT16)s);                      // 可能是断开了
+                    printf("Mouse error %02x\n",(UINT16)s);                      // 可能是断开了
                 }
             }
             else
             {
-                printf("no interrupt endpoint\n");
+                printf("Mouse no interrupt endpoint\n");
             }
             SetUsbSpeed( 1 );                                                    // 默认为全速
         }
-
+        // 用定时模拟主观需求,需要操作键盘
+        loc = SearchTypeDevice( DEV_TYPE_KEYBOARD );                             // 在ROOT-HUB以及外部HUB各端口上搜索指定类型的设备所在的端口号
+        if ( loc != 0xFFFF )                                                     // 找到了,如果有两个KeyBoard如何处理?
+        {
+            printf( "Query Keyboard @%04X\n", loc );
+            i = (UINT8)( loc >> 8 );
+            len = (UINT8)loc;
+            SelectHubPort( i, len );                                             // 选择操作指定的ROOT-HUB端口,设置当前USB速度以及被操作设备的USB地址
+            endp = len ? DevOnHubPort[i][len-1].GpVar : RootHubDev[i].GpVar;     // 中断端点的地址,位7用于同步标志位
+            printf("%02X  ",endp);
+            if ( endp & USB_ENDP_ADDR_MASK )                                     // 端点有效
+            {
+                s = USBHostTransact( USB_PID_IN << 4 | endp & 0x7F, endp & 0x80 ? bUH_R_TOG | bUH_T_TOG : 0, 0 );// CH559传输事务,获取数据,NAK不重试
+                if ( s == ERR_SUCCESS )
+                {
+                    endp ^= 0x80;                                                // 同步标志翻转
+                    if ( len )
+                    {
+                        DevOnHubPort[i][len-1].GpVar = endp;                     // 保存同步标志位
+                    }
+                    else
+                    {
+                        RootHubDev[i].GpVar = endp;
+                    }
+                    len = USB_RX_LEN;                                            // 接收到的数据长度
+                    if ( len )
+                    {
+                        SETorOFFNumLock(RxBuffer);
+                        printf("keyboard data: ");
+                        for ( i = 0; i < len; i ++ )
+                        {
+                            printf("x%02X ",(UINT16)(RxBuffer[i]) );
+                        }
+                        printf("\n");
+                    }
+                }
+                else if ( s != ( USB_PID_NAK | ERR_USB_TRANSFER ) )
+                {
+                    printf("keyboard error %02x\n",(UINT16)s);                    // 可能是断开了
+                }
+            }
+            else
+            {
+                printf("keyboard no interrupt endpoint\n");
+            }
+            SetUsbSpeed( 1 );                                                     // 默认为全速
+        }
+        //操作HUB
+        loc = SearchTypeDevice( DEV_TYPE_KEYBOARD );                              // 在ROOT-HUB以及外部HUB各端口上搜索指定类型的设备所在的端口号
+        if ( loc != 0xFFFF )                                                      // 找到了,如果有两个KeyBoard如何处理?
+        {
+            printf( "Query Keyboard @%04X\n", loc );
+            i = (UINT8)( loc >> 8 );
+            len = (UINT8)loc;
+            SelectHubPort( i, len );                                              // 选择操作指定的ROOT-HUB端口,设置当前USB速度以及被操作设备的USB地址
+            endp = len ? DevOnHubPort[i][len-1].GpVar : RootHubDev[i].GpVar;      // 中断端点的地址,位7用于同步标志位
+            printf("%02X  ",endp);
+            if ( endp & USB_ENDP_ADDR_MASK )                                      // 端点有效
+            {
+                s = USBHostTransact( USB_PID_IN << 4 | endp & 0x7F, endp & 0x80 ? bUH_R_TOG | bUH_T_TOG : 0, 0 );// CH559传输事务,获取数据,NAK不重试
+                if ( s == ERR_SUCCESS )
+                {
+                    endp ^= 0x80;                                                 // 同步标志翻转
+                    if ( len )
+                    {
+                        DevOnHubPort[i][len-1].GpVar = endp;                      // 保存同步标志位
+                    }
+                    else
+                    {
+                        RootHubDev[i].GpVar = endp;
+                    }
+                    len = USB_RX_LEN;                                             // 接收到的数据长度
+                    if ( len )
+                    {
+                        //SETorOFFNumLock(RxBuffer);
+                        printf("keyboard data: ");
+                        for ( i = 0; i < len; i ++ )
+                        {
+                            printf("x%02X ",(UINT16)(RxBuffer[i]) );
+                        }
+                        printf("\n");
+                    }
+                }
+                else if ( s != ( USB_PID_NAK | ERR_USB_TRANSFER ) )
+                {
+                    printf("keyboard error %02x\n",(UINT16)s);                    // 可能是断开了
+                }
+            }
+            else
+            {
+                printf("keyboard no interrupt endpoint\n");
+            }
+            SetUsbSpeed( 1 );                                                     // 默认为全速
+        }
+        for(i=0; i<2; i++)
+        {
+            if((RootHubDev[i].DeviceStatus == ROOT_DEV_SUCCESS)&&(RootHubDev[i].DeviceType == USB_DEV_CLASS_HUB))
+            {
+                SelectHubPort( i, 0 );                                            // 选择操作指定的ROOT-HUB端口,设置当前USB速度以及被操作设备的USB地址
+                endp = RootHubDev[i].GpVar1;                                      // 中断端点的地址,位7用于同步标志位
+                if ( endp & USB_ENDP_ADDR_MASK )                                  // 端点有效
+                {
+                    s = USBHostTransact( USB_PID_IN << 4 | endp & 0x7F, endp & 0x80 ? bUH_R_TOG | bUH_T_TOG : 0, 0 );// CH559传输事务,获取数据,NAK不重试
+                    if ( s == ERR_SUCCESS )
+                    {
+                        endp ^= 0x80;                                             // 同步标志翻转
+                        RootHubDev[i].GpVar1 = endp;                              // 保存同步标志位
+                        len = USB_RX_LEN;                                         // 接收到的数据长度
+                        if ( len )
+                        {
+                            EnumHubPort(i);
+                            for ( i = 0; i < len; i ++ )
+                            {
+                                printf("x%02X ",(UINT16)(RxBuffer[i]) );
+                            }
+                            printf("\n");
+                        }
+                    }
+                    else if ( s != ( USB_PID_NAK | ERR_USB_TRANSFER ) )
+                    {
+                        printf("HUB error %02x\n",(UINT16)s);                     // 可能是断开了
+                    }
+                }
+                else
+                {
+                    printf("HUB %02d no interrupt endpoint\n",i);
+                }
+            }
+            else
+            {
+                //printf("ROOTHUB %02d not HUB\n",i);
+                //printf(".");
+            }
+        }
+        //操作USB打印机
+        if((P4_IN&0x01) == 0)                                                     //P40为低，开始打印
+        {
+            memset(TxBuffer,0,sizeof(TxBuffer));
+            TxBuffer[0]=0x1B;
+            TxBuffer[1]=0x40;
+            TxBuffer[2]=0x1D;
+            TxBuffer[3]=0x55;
+            TxBuffer[4]=0x42;
+            TxBuffer[5]=0x02;
+            TxBuffer[6]=0x18;
+            TxBuffer[7]=0x1D;
+            TxBuffer[8]=0x76;
+            TxBuffer[9]=0x30;
+            TxBuffer[10]=0x00;
+            TxBuffer[11]=0x30;
+            TxBuffer[12]=0x00;
+            TxBuffer[13]=0x18;
+            loc = SearchTypeDevice( USB_DEV_CLASS_PRINTER );                          // 在ROOT-HUB以及外部HUB各端口上搜索指定类型的设备所在的端口号
+            if ( loc != 0xFFFF )                                                      // 找到了,如果有两个打印机如何处理?
+            {
+                printf( "Query Printer @%04X\n", loc );
+                i = (UINT8)( loc >> 8 );
+                len = (UINT8)loc;
+                SelectHubPort( i, len );                                              // 选择操作指定的ROOT-HUB端口,设置当前USB速度以及被操作设备的USB地址
+                endp = len ? DevOnHubPort[i][len-1].GpVar : RootHubDev[i].GpVar;      // 端点的地址,位7用于同步标志位
+                printf("%02X  ",endp);
+                if ( endp & USB_ENDP_ADDR_MASK )                                      // 端点有效
+                {
+                    UH_TX_LEN = 64;                                                   // 默认无数据故状态阶段为IN
+                    s = USBHostTransact( USB_PID_OUT << 4 | endp & 0x7F, endp & 0x80 ? bUH_R_TOG | bUH_T_TOG : 0, 0xffff );// CH559传输事务,获取数据,NAK重试
+                    if ( s == ERR_SUCCESS )
+                    {
+                        endp ^= 0x80;                                                 // 同步标志翻转
+                        memset(TxBuffer,0,sizeof(TxBuffer));
+                        UH_TX_LEN = 64;                                                   // 默认无数据故状态阶段为IN
+                        s = USBHostTransact( USB_PID_OUT << 4 | endp & 0x7F, endp & 0x80 ? bUH_R_TOG | bUH_T_TOG : 0, 0xffff );// CH559传输事务,获取数据,NAK重试
+                    }
+                    else if ( s != ( USB_PID_NAK | ERR_USB_TRANSFER ) )
+                    {
+                        printf("Printer error %02x\n",(UINT16)s);                    // 可能是断开了
+                    }
+                }
+                SetUsbSpeed( 1 );                                                     // 默认为全速
+            }
+        }
+        loc = SearchTypeDevice( USB_DEV_CLASS_STORAGE );   // 在ROOT-HUB以及外部HUB各端口上搜索指定类型的设备所在的端口号
+        if ( loc != 0xFFFF )    // 找到了
+        {
+            printf( "Start UDISK_demo @CH559UFI library\n" );
+            // U盘操作流程：USB总线复位、U盘连接、获取设备描述符和设置USB地址、可选的获取配置描述符，之后到达此处，由CH559子程序库继续完成后续工作
+            i = (UINT8)( loc >> 8 );
+            len = (UINT8)loc;
+            SelectHubPort( i, len );                              // 选择操作指定的ROOT-HUB端口,设置当前USB速度以及被操作设备的USB地址
+            CH559DiskStatus = DISK_USB_ADDR;
+            for ( i = 0; i != 10; i ++ )
+            {
+                printf( "Wait DiskReady\n" );
+                s = CH559DiskReady( );
+                if ( s == ERR_SUCCESS )
+                {
+                    break;
+                }
+                mDelaymS( 50 );
+            }
+            if ( CH559DiskStatus >= DISK_MOUNTED )          //U盘准备好
+            {
+                /* 读取原文件 */
+                printf( "Open File\n" );
+                strcpy( mCmdParam.Open.mPathName, "/C51/CH559HFT.C" );  //文件名,该文件在C51子目录下
+                s = CH559FileOpen( );                       //打开文件
+                if ( s == ERR_MISS_DIR || s == ERR_MISS_FILE )//没有找到文件
+                {
+                    printf( "没有找到文件\n" );
+                }
+                else                                        //找到文件或者出错
+                {
+                    printf( "%02x 没有找到文件\n",(UINT16)CH559DiskStatus );
+                    TotalCount = 100;                       //准备读取总长度
+                    printf( "从文件中读出的前%d个字符是:\n",TotalCount );
+                    while ( TotalCount )                    //如果文件比较大,一次读不完,可以再调用CH559ByteRead继续读取,文件指针自动向后移动
+                    {
+                        if ( TotalCount > (MAX_PATH_LEN-1) )
+                        {
+                            c = MAX_PATH_LEN-1;             //剩余数据较多,限制单次读写的长度不能超过 sizeof( mCmdParam.Other.mBuffer )
+                        }
+                        else
+                        {
+                            c = TotalCount;                 //最后剩余的字节数
+                        }
+                        mCmdParam.ByteRead.mByteCount = c;  //请求读出几十字节数据
+                        mCmdParam.ByteRead.mByteBuffer= &buf[0];
+                        s = CH559ByteRead( );               //以字节为单位读取数据块,单次读写的长度不能超过MAX_BYTE_IO,第二次调用时接着刚才的向后读
+                        TotalCount -= mCmdParam.ByteRead.mByteCount;//计数,减去当前实际已经读出的字符数
+                        for ( i=0; i!=mCmdParam.ByteRead.mByteCount; i++ )
+                        {
+                            printf( "%C", mCmdParam.ByteRead.mByteBuffer[i] );//显示读出的字符
+                        }
+                        if ( mCmdParam.ByteRead.mByteCount < c )//实际读出的字符数少于要求读出的字符数,说明已经到文件的结尾
+                        {
+                            printf( "\n" );
+                            printf( "文件已经结束\n" );
+                            break;
+                        }
+                    }
+                    printf( "Close\n" );
+                    i = CH559FileClose( );                  //关闭文件
+                    mStopIfError( i );
+                }
+                /*  如果希望从指定位置开始读写,可以移动文件指针
+                        mCmdParam.ByteLocate.mByteOffset = 608; //跳过文件的前608个字节开始读写
+                        CH559ByteLocate( );
+                        mCmdParam.ByteRead.mByteCount = 5;      //读取5个字节
+                        mCmdParam.ByteRead.mByteBuffer= &buf[0];
+                        CH559ByteRead( );                       //直接读取文件的第608个字节到612个字节数据,前608个字节被跳过
+                        //如果希望将新数据添加到原文件的尾部,可以移动文件指针
+                        CH559FileOpen( );
+                        mCmdParam.ByteLocate.mByteOffset = 0xffffffff;//移到文件的尾部
+                        CH559ByteLocate( );
+                        mCmdParam.ByteWrite.mByteCount = 13;    //写入13个字节的数据
+                        CH559ByteWrite( );                      //在原文件的后面添加数据,新加的13个字节接着原文件的尾部放置
+                        mCmdParam.ByteWrite.mByteCount = 2;     //写入2个字节的数据
+                        CH559ByteWrite( );                      //继续在原文件的后面添加数据
+                        mCmdParam.ByteWrite.mByteCount = 0;     //写入0个字节的数据,实际上该操作用于通知程序库更新文件长度
+                        CH559ByteWrite( );                      //写入0字节的数据,用于自动更新文件的长度,所以文件长度增加15,如果不这样做,那么执行CH559FileClose时也会自动更新文件长度
+                */
+                printf( "Create File\n" );
+                strcpy( mCmdParam.Create.mPathName, "/NEWFILE.TXT" );//新文件名,在根目录下,中文文件名
+                s = CH559FileCreate( );                     //新建文件并打开,如果文件已经存在则先删除后再新建
+                mStopIfError( s );
+                printf( "ByteWrite\n" );
+                //实际应该判断写数据长度和定义缓冲区长度是否相符，如果大于缓冲区长度则需要多次写入
+                i = sprintf( buf,"Note: \xd\xa这个程序是以字节为单位进行U盘文件读写,559简单演示功能。\xd\xa");/*演示 */
+                for(c=0; c<10; c++)
+                {
+                    mCmdParam.ByteWrite.mByteCount = i;     /* 指定本次写入的字节数 */
+                    mCmdParam.ByteWrite.mByteBuffer = buf;  /* 指向缓冲区 */
+                    s = CH559ByteWrite( );                  /* 以字节为单位向文件写入数据 */
+                    mStopIfError( s );
+                    printf("成功写入 %02X次\n",(UINT16)c);
+                }
+                printf( "Modify\n" );
+                mCmdParam.Modify.mFileAttr = 0xff;          //输入参数: 新的文件属性,为0FFH则不修改
+                mCmdParam.Modify.mFileTime = 0xffff;        //输入参数: 新的文件时间,为0FFFFH则不修改,使用新建文件产生的默认时间
+                mCmdParam.Modify.mFileDate = MAKE_FILE_DATE( 2020, 8, 15 );  //输入参数: 新的文件日期: 2016.01.15
+                mCmdParam.Modify.mFileSize = 0xffffffff;    //输入参数: 新的文件长度,以字节为单位写文件应该由程序库关闭文件时自动更新长度,所以此处不修改
+                i = CH559FileModify( );                     //修改当前文件的信息,修改日期
+                mStopIfError( i );
+                printf( "Close\n" );
+                mCmdParam.Close.mUpdateLen = 1;             //自动计算文件长度,以字节为单位写文件,建议让程序库关闭文件以便自动更新文件长度
+                i = CH559FileClose( );
+                mStopIfError( i );
+                /*
+                                                        printf( "RenameFilename\n" );
+                                                        strcpy( mCmdParam.Open.mPathName, "/111.TXT" );  //文件名,该文件在C51子目录下
+                                                        s = CH559FileOpen( );                       //打开文件
+                                                        if(s == ERR_SUCCESS){
+                                                            i = RenameFilename(Rename,sizeof(Rename));
+                                                            if ( i != ERR_SUCCESS ) printf( "Error Rename fail: %02X\n", (UINT16)i );//显示错误
+                                                        }
+                */
+                /* 删除某文件 */
+                printf( "Delete\n" );
+                strcpy( mCmdParam.Create.mPathName, "/OLD.TXT" );//将被删除的文件名,在根目录下
+                i = CH559FileErase( );                      //删除文件并关闭
+                if ( i != ERR_SUCCESS )
+                {
+                    printf( "Error File not exist: %02X\n", (UINT16)i );    //显示错误
+                }
+                printf( "U盘演示完成\n" );
+            }
+            else
+            {
+                printf( "U盘没有准备好 ERR =%02X\n", (UINT16)s );
+            }
+			while(1);                                                       //U盘演示时，代码停在此处
+        }
     }
 }

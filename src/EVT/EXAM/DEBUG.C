@@ -1,8 +1,8 @@
 /********************************** (C) COPYRIGHT *******************************
 * File Name          : DEBUG.C
 * Author             : WCH
-* Version            : V1.3
-* Date               : 2016/06/24
+* Version            : V1.9
+* Date               : 2021/12/15
 * Description        : CH559 DEBUG Interface
                      (1)、串口0输出打印信息，波特率可变;              				   
 *******************************************************************************/
@@ -14,6 +14,8 @@
 #ifndef  BUAD
 #define  BUAD    57600
 #endif
+
+#define  OSC_EN_XT 0
 
 /*******************************************************************************
 * Function Name  : CfgFsys( )
@@ -27,10 +29,19 @@
 *******************************************************************************/ 
 void	CfgFsys( )  
 {
-    SAFE_MOD = 0x55;                                                           //开启安全模式
+#if OSC_EN_XT
+	SAFE_MOD = 0x55;                                                           //开启安全模式
     SAFE_MOD = 0xAA;                                                 
-//  CLOCK_CFG |= bOSC_EN_XT;                                                   //使能外部晶振                                         
-//  CLOCK_CFG &= ~bOSC_EN_INT;                                              
+	CLOCK_CFG |= bOSC_EN_XT;                                                   //使能外部晶振
+    mDelaymS(10);
+	SAFE_MOD = 0x55;                                                           //开启安全模式
+    SAFE_MOD = 0xAA;   
+	CLOCK_CFG &= ~bOSC_EN_INT;
+	SAFE_MOD = 0x00; 
+#endif 
+
+	SAFE_MOD = 0x55;                                                           //开启安全模式
+    SAFE_MOD = 0xAA;                                                 
 // 	CLOCK_CFG &= ~MASK_SYS_CK_DIV;
 //  CLOCK_CFG |= 6;                                                            //配置系统时钟48MHz
 //  CLOCK_CFG |= 8;                                                            //配置系统时钟36MHz
@@ -44,6 +55,7 @@ void	CfgFsys( )
 */	
     SAFE_MOD = 0xFF;                                                           //关闭安全模式  
 //  如果修改主频，要同时修改FREQ_SYS，否则会造成延时函数不准
+
 }
 
 /*******************************************************************************

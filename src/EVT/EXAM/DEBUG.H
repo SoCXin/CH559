@@ -20,6 +20,10 @@
 #define  STOP    0
 #endif
 
+#ifndef MIN
+#define MIN(a,b)                (((a) <= (b)) ? (a) : (b))
+#endif
+
 void	CfgFsys( );                        //CH559时钟选择和配置
 void	mDelayuS( UINT16 n );              // 以uS为单位延时
 void	mDelaymS( UINT16 n );              // 以mS为单位延时

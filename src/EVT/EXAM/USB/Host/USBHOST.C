@@ -89,7 +89,7 @@ void    SetHostUsbAddr( UINT8 addr );        // 设置USB主机当前操作的USB设备地址
 #else
 void    SetUsbSpeed( UINT8 FullSpeed );      // 设置当前USB速度
 #endif
-void    ResetRootHubPort( void );            // 检测到设备后,复位总线,为枚举设备准备,设置为默认为全速
+UINT8   ResetRootHubPort( void );            // 检测到设备后,复位总线,为枚举设备准备,设置为默认为全速
 UINT8   EnableRootHubPort( void );           // 使能端口,相应的bUH_PORT_EN置1开启端口,设备断开可能导致返回失败
 UINT8   WaitUSB_Interrupt( void );           // 等待USB中断
 // CH559传输事务,输入目的端点地址/PID令牌,同步标志,以20uS为单位的NAK重试总时间(0则不重试,0xFFFF无限重试),返回0成功,超时/出错重试
@@ -288,16 +288,35 @@ void    SetUsbSpeed( UINT8 FullSpeed )                          //非U盘操作
 * Output         : None
 * Return         : None
 *******************************************************************************/
-void    ResetRootHubPort( void )
+UINT8   ResetRootHubPort( void )
 {
-    UsbDevEndp0Size = DEFAULT_ENDP0_SIZE;                       /* USB设备的端点0的最大包尺寸 */
-    SetHostUsbAddr( 0x00 );
-    SetUsbSpeed( 1 );                                           // 默认为全速
-    UHUB0_CTRL = UHUB0_CTRL & ~ bUH_LOW_SPEED | bUH_BUS_RESET;  // 默认为全速,开始复位
-    mDelaymS( 15 );                                             // 复位时间10mS到20mS
-    UHUB0_CTRL = UHUB0_CTRL & ~ bUH_BUS_RESET;                  // 结束复位
-    mDelayuS( 250 );
-    UIF_DETECT = 0;                                             // 清中断标志
+    UINT16 n = 30000;
+	UsbDevEndp0Size = DEFAULT_ENDP0_SIZE;                        //USB设备的端点0的最大包尺寸
+    SetHostUsbAddr( 0x00 );			
+    SetUsbSpeed( 1 );                                            // 默认为全速
+    UHUB0_CTRL = UHUB0_CTRL & ~ bUH_LOW_SPEED | bUH_BUS_RESET;// 默认为全速,开始复位
+    while( n ) 
+	{  
+		++ SAFE_MOD;  												
+		++ SAFE_MOD;
+		++ SAFE_MOD;
+		++ SAFE_MOD;
+		++ SAFE_MOD;
+		++ SAFE_MOD;
+		++ SAFE_MOD;
+		++ SAFE_MOD;
+		++ SAFE_MOD;
+		if( USB_HUB_ST & ( bUHS_DP_PIN | bUHS_DM_PIN ) )
+		{
+			UHUB0_CTRL = UHUB0_CTRL & ~bUH_BUS_RESET;  						/* 结束复位 */
+			return( 0x01 );
+		}
+		-- n;
+	}
+    UHUB0_CTRL = UHUB0_CTRL & ~ bUH_BUS_RESET;               // 结束复位
+    mDelayuS( 200 );
+    UIF_DETECT = 0;											     // 清连接中断标志
+	return ( 0x00 );
 }
 /*******************************************************************************
 * Function Name  : EnableRootHubPort
@@ -781,8 +800,8 @@ UINT8   InitRootDevice( void )
         return( ERR_USB_DISCON );
     }
     SetUsbSpeed( ThisUsbDev.DeviceSpeed );                                       // 设置当前USB速度
-    printf( "GetDevDescr: " );
-    s = CtrlGetDeviceDescr( );                                                   // 获取设备描述符
+    printf( "GetDevDescr: " );    
+	s = CtrlGetDeviceDescr( );                                                   // 获取设备描述符
     if ( s == ERR_SUCCESS )
     {
         for ( i = 0; i < ( (PUSB_SETUP_REQ)SetupGetDevDescr ) -> wLengthL; i ++ )
@@ -1033,8 +1052,8 @@ main( )
     mInitSTDIO( );                                                                       /* 为了让计算机通过串口监控演示过程 */
     printf( "Start @ChipID=%02X\n", (UINT16)CHIP_ID );
     InitUSB_Host( );
-    CH559LibInit( );                                                                     /* 初始化CH559程序库以支持U盘文件 */
-    FoundNewDev = 0;
+	CH559LibInit( );                                                                     /* 初始化CH559程序库以支持U盘文件 */
+	FoundNewDev = 0;
     printf( "Wait Device In\n" );
     while ( 1 )
     {

@@ -2,8 +2,8 @@
 /********************************** (C) COPYRIGHT *******************************
 * File Name          : GPIO.C
 * Author             : WCH
-* Version            : V1.3
-* Date               : 2016/6/24
+* Version            : V1.9
+* Date               : 2021/12/15
 * Description        : CH559的GPIO操作，使用时可以简单操作，直接配置
                        IO配置主要跟一下寄存器的状态有关系
 											 bPn_OC & Pn_DIR & Pn_PU: pin input & output configuration for Pn (n=0/1/2/3)
@@ -74,7 +74,7 @@ UINT8 CH559GPIOModeSelt(UINT8 Port,UINT8 Mode,UINT8 PinNum)
     		break;
     	case 2:                                                                //推挽输出，高低电平强驱动
     		PORT_CFG &= ~(bP0_OC << Port);
-    		Pn_DIR |= ~(1<<PinNum);
+    		Pn_DIR |= (1<<PinNum);
     		break;
     	case 3:                                                                //开漏输出，无上拉，支持输入
     		PORT_CFG |= (bP0_OC << Port);

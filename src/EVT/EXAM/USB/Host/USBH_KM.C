@@ -92,7 +92,7 @@ UINT8   AnalyzeRootHub( void );                        // 分析ROOT-HUB状态,处理R
 // 返回ERR_SUCCESS为没有情况,返回ERR_USB_CONNECT为检测到新连接,返回ERR_USB_DISCON为检测到断开
 void    SetHostUsbAddr( UINT8 addr );                  // 设置USB主机当前操作的USB设备地址
 void    SetUsbSpeed( UINT8 FullSpeed );                // 设置当前USB速度
-void    ResetRootHubPort( UINT8 RootHubIndex );        // 检测到设备后,复位相应端口的总线,为枚举设备准备,设置为默认为全速
+UINT8   ResetRootHubPort( UINT8 RootHubIndex );        // 检测到设备后,复位相应端口的总线,为枚举设备准备,设置为默认为全速
 UINT8   EnableRootHubPort( UINT8 RootHubIndex );       // 使能ROOT-HUB端口,相应的bUH_PORT_EN置1开启端口,设备断开可能导致返回失败
 void    SelectHubPort( UINT8 RootHubIndex, UINT8 HubPortIndex );// HubPortIndex=0选择操作指定的ROOT-HUB端口,否则选择操作指定的ROOT-HUB端口的外部HUB的指定端口
 UINT8   WaitUSB_Interrupt( void );                     // 等待USB中断
@@ -363,25 +363,61 @@ void    SetUsbSpeed( UINT8 FullSpeed )
 * Output         : None
 * Return         : None
 *******************************************************************************/
-void    ResetRootHubPort( UINT8 RootHubIndex )
+UINT8   ResetRootHubPort( UINT8 RootHubIndex )
 {
-    UsbDevEndp0Size = DEFAULT_ENDP0_SIZE;                        //USB设备的端点0的最大包尺寸
-    SetHostUsbAddr( 0x00 );
+    UINT16 n = 30000;
+	UsbDevEndp0Size = DEFAULT_ENDP0_SIZE;                        //USB设备的端点0的最大包尺寸
+    SetHostUsbAddr( 0x00 );	
     SetUsbSpeed( 1 );                                            // 默认为全速
     if ( RootHubIndex == 1 )
     {
         UHUB1_CTRL = UHUB1_CTRL & ~ bUH_LOW_SPEED | bUH_BUS_RESET;// 默认为全速,开始复位
-        mDelaymS( 25 );                                          // 复位时间10mS到20mS
+		while( n )
+		{
+			++ SAFE_MOD;  												
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			if( USB_HUB_ST & ( bUHS_HP_PIN | bUHS_HM_PIN ) )
+			{
+				UHUB1_CTRL = UHUB1_CTRL & ~bUH_BUS_RESET;  						/* 结束复位 */
+				return( 0x01 );
+			}
+			--n;
+		}
         UHUB1_CTRL = UHUB1_CTRL & ~ bUH_BUS_RESET;               // 结束复位
     }
     else
     {
         UHUB0_CTRL = UHUB0_CTRL & ~ bUH_LOW_SPEED | bUH_BUS_RESET;// 默认为全速,开始复位
-        mDelaymS( 25 );                                          // 复位时间10mS到20mS
+        while( n ) 
+		{  
+			++ SAFE_MOD;  												
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			++ SAFE_MOD;
+			if( USB_HUB_ST & ( bUHS_DP_PIN | bUHS_DM_PIN ) )
+			{
+				UHUB0_CTRL = UHUB0_CTRL & ~bUH_BUS_RESET;  						/* 结束复位 */
+				return( 0x01 );
+			}
+			-- n;
+		}
         UHUB0_CTRL = UHUB0_CTRL & ~ bUH_BUS_RESET;               // 结束复位
     }
-    mDelayuS( 250 );
-    UIF_DETECT = 0;                                              // 清中断标志
+    mDelayuS( 200 );
+    UIF_DETECT = 0;											     // 清连接中断标志
+	return ( 0x00 );
 }
 /*******************************************************************************
 * Function Name  : EnableRootHubPort( UINT8 RootHubIndex )
@@ -868,7 +904,7 @@ UINT8   InitRootDevice( UINT8 RootHubIndex )
     {
         mDelaymS( 100*retry );
         retry++;
-        ResetRootHubPort( RootHubIndex );                              // 检测到设备后,复位相应端口的USB总线
+        ResetRootHubPort( RootHubIndex );                    // 检测到设备后,复位相应端口的USB总线
         for ( i = 0, s = 0; i < 100; i ++ )                            // 等待USB设备复位后重新连接,100mS超时
         {
             mDelaymS( 1 );

@@ -5,7 +5,8 @@
 [![Build Status](https://github.com/SoCXin/CH559/workflows/src/badge.svg)](https://github.com/SoCXin/CH559/actions/workflows/src.yml)
 
 * [WCH](http://www.wch.cn/)：[8051](https://github.com/SoCXin/8051)
-* [L3R3](https://github.com/SoCXin/Level)：56 MHz
+* [L2R2](https://github.com/SoCXin/Level)：56 MHz
+* [Xin文档](https://docs.soc.xin/CH559)
 
 ## [简介](https://github.com/SoCXin/CH559/wiki)
 

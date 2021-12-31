@@ -11,6 +11,9 @@
 #include <string.h>
 
 #define THIS_ENDP0_SIZE         DEFAULT_ENDP0_SIZE
+#define ENDP1_IN_SIZE           64
+#define ENDP2_IN_SIZE           64
+#define ENDP2_OUT_SIZE          64
 
 /*设备描述符*/
 UINT8C  MyDevDescr[] = { 0x12, 0x01, 0x10, 0x01,
@@ -22,9 +25,9 @@ UINT8C  MyDevDescr[] = { 0x12, 0x01, 0x10, 0x01,
 /*配置描述符*/
 UINT8C  MyCfgDescr[] = { 0x09, 0x02, 0x27, 0x00, 0x01, 0x01, 0x00, 0x80, 0x32,
                          0x09, 0x04, 0x00, 0x00, 0x03, 0xFF, 0x80, 0x55, 0x00,
-                         0x07, 0x05, 0x82, 0x02, 0x40, 0x00, 0x00,
-                         0x07, 0x05, 0x02, 0x02, 0x40, 0x00, 0x00,
-                         0x07, 0x05, 0x81, 0x03, 0x40, 0x00, 0x00
+                         0x07, 0x05, 0x82, 0x02, ENDP2_IN_SIZE, 0x00, 0x00,
+                         0x07, 0x05, 0x02, 0x02, ENDP2_OUT_SIZE, 0x00, 0x00,
+                         0x07, 0x05, 0x81, 0x03, ENDP1_IN_SIZE, 0x00, 0x00
                        };
 /*语言描述符*/
 UINT8C  MyLangDescr[] = { 0x04, 0x03, 0x09, 0x04 };
@@ -34,9 +37,9 @@ UINT8C  MyManuInfo[] = { 0x0E, 0x03, 'w', 0, 'c', 0, 'h', 0, '.', 0, 'c', 0, 'n'
 UINT8C  MyProdInfo[] = { 0x0C, 0x03, 'C', 0, 'H', 0, '5', 0, '5', 0, '9', 0 };
 
 UINT8   UsbConfig = 0;                                                         // USB配置标志
-UINT8X  Ep0Buffer[64<(THIS_ENDP0_SIZE+2)?64:(THIS_ENDP0_SIZE+2)] _at_ 0x0000 ; // OUT&IN, must even address
-UINT8X  Ep1Buffer[64<(MAX_PACKET_SIZE+2)?64:(MAX_PACKET_SIZE+2)] _at_ 0x0200 ; // IN, must even address
-UINT8X  Ep2Buffer[128<(2*MAX_PACKET_SIZE+4)?128:(2*MAX_PACKET_SIZE+4)] _at_ 0x0240 ;// OUT+IN, must even address
+UINT8X  Ep0Buffer[MIN(64,THIS_ENDP0_SIZE+2)] _at_ 0x0000 ; // OUT&IN, must even address
+UINT8X  Ep1Buffer[MIN(64,ENDP1_IN_SIZE+2)] _at_ MIN(64,THIS_ENDP0_SIZE+2); // IN, must even address
+UINT8X  Ep2Buffer[MIN(64,ENDP2_IN_SIZE+2)+MIN(64,ENDP2_OUT_SIZE+2)] _at_ (MIN(64,THIS_ENDP0_SIZE+2)+MIN(64,ENDP1_IN_SIZE+2));// OUT+IN, must even address
 
 #define UsbSetupBuf     ((PUSB_SETUP_REQ)Ep0Buffer)
 
@@ -82,7 +85,7 @@ void    USB_DeviceInterrupt( void ) interrupt INT_NO_USB using 1               /
             case UIS_TOKEN_OUT | 2:                                            // endpoint 2# 批量端点下传
                 if ( U_TOG_OK )                                                // 不同步的数据包将丢弃
                 {
-//                      UEP2_CTRL ^= bUEP_R_TOG;                               // 已自动翻转
+                    UEP2_CTRL ^= bUEP_R_TOG;                                   // 手动翻转
                     len = USB_RX_LEN;
                     for ( i = 0; i < len; i ++ )
                     {
@@ -93,15 +96,16 @@ void    USB_DeviceInterrupt( void ) interrupt INT_NO_USB using 1               /
                 }
                 break;
             case UIS_TOKEN_IN | 2:                                             // endpoint 2# 批量端点上传
-//                  UEP2_CTRL ^= bUEP_T_TOG;                                   // 已自动翻转
+                UEP2_CTRL ^= bUEP_T_TOG;                                       // 手动翻转
                 UEP2_CTRL = UEP2_CTRL & ~ MASK_UEP_T_RES | UEP_T_RES_NAK;      // 暂停上传
                 break;
             case UIS_TOKEN_IN | 1:                                             // endpoint 1# 中断端点上传
-//                  UEP1_CTRL ^= bUEP_T_TOG;                                   // 已自动翻转
+                UEP1_CTRL ^= bUEP_T_TOG;                                       // 手动翻转
                 UEP1_CTRL = UEP1_CTRL & ~ MASK_UEP_T_RES | UEP_T_RES_NAK;      // 暂停上传
                 break;
             case UIS_TOKEN_SETUP | 0:                                          // endpoint 0# SETUP
-                len = USB_RX_LEN;
+                UEP0_CTRL = bUEP_R_TOG | bUEP_T_TOG | UEP_R_RES_ACK | UEP_T_RES_ACK;
+				len = USB_RX_LEN;
                 if ( len == sizeof( USB_SETUP_REQ ) )                          // SETUP包长度
                 {
                     SetupLen = UsbSetupBuf->wLengthL;
@@ -364,8 +368,8 @@ void    USB_DeviceInterrupt( void ) interrupt INT_NO_USB using 1               /
     else if ( UIF_BUS_RST )                                                         // USB总线复位
     {
         UEP0_CTRL = UEP_R_RES_ACK | UEP_T_RES_NAK;
-        UEP1_CTRL = bUEP_AUTO_TOG | UEP_R_RES_ACK;
-        UEP2_CTRL = bUEP_AUTO_TOG | UEP_R_RES_ACK | UEP_T_RES_NAK;
+        UEP1_CTRL = UEP_T_RES_NAK;
+        UEP2_CTRL = UEP_R_RES_ACK | UEP_T_RES_NAK;
         USB_DEV_AD = 0x00;
         LED_CFG = 1;
         UIF_SUSPEND = 0;
@@ -412,9 +416,6 @@ void    InitUSB_Device( void )                                                  
     UEP0_DMA = Ep0Buffer;
     UEP1_DMA = Ep1Buffer;
     UEP2_DMA = Ep2Buffer;
-    UEP0_CTRL = UEP_R_RES_ACK | UEP_T_RES_NAK;
-    UEP1_CTRL = bUEP_AUTO_TOG | UEP_R_RES_ACK;
-    UEP2_CTRL = bUEP_AUTO_TOG | UEP_R_RES_ACK | UEP_T_RES_NAK;
     USB_DEV_AD = 0x00;
     UDEV_CTRL = bUD_DP_PD_DIS | bUD_DM_PD_DIS;                                      // 禁止DP/DM下拉电阻
     USB_CTRL = bUC_DEV_PU_EN | bUC_INT_BUSY | bUC_DMA_EN;                           // 启动USB设备及DMA，在中断期间中断标志未清除前自动返回NAK
